@@ -38,17 +38,25 @@ function Apply-Patch {
         Write-Warning ("[adapter-patch] missing file: {0} -- adapter version mismatch?" -f $Path)
         exit 1
     }
-    $text = Get-Content $Path -Raw
-    if ($text.Contains($Marker)) {
+    # Read raw bytes to preserve original encoding/BOM, then normalize line
+    # endings to LF for matching: the adapter ships LF-only on every
+    # platform, but our heredocs may be saved with CRLF on Windows.
+    $text = [IO.File]::ReadAllText($Path)
+    $textLF = $text -replace "`r`n", "`n"
+    $findLF = $Find -replace "`r`n", "`n"
+    $replaceLF = $Replace -replace "`r`n", "`n"
+    if ($textLF.Contains($Marker)) {
         Write-Host ("[adapter-patch] {0} : already applied." -f $Label)
         return
     }
-    if (-not $text.Contains($Find)) {
+    if (-not $textLF.Contains($findLF)) {
         Write-Warning ("[adapter-patch] {0} : upstream source does not match expected pattern. Adapter version may have changed; review the patch script." -f $Label)
         exit 1
     }
-    $patched = $text.Replace($Find, $Replace)
-    Set-Content -Path $Path -Value $patched -NoNewline
+    $patched = $textLF.Replace($findLF, $replaceLF)
+    # Write back as LF to preserve the file's original line-ending style.
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [IO.File]::WriteAllText((Resolve-Path $Path), $patched, $utf8NoBom)
     Write-Host ("[adapter-patch] {0} : applied." -f $Label)
 }
 
@@ -118,5 +126,33 @@ $bridgeReplace = @'
  */
 '@
 Apply-Patch -Path $bridgePath -Marker $bridgeMarker -Find $bridgeFind -Replace $bridgeReplace -Label 'lvgl_bridge_v9.c (bounded TX-done wait)'
+
+# --- Patch 3: esp_timer_stop_blocking() not in IDF v6.0.1 (0.4.3 only) ----
+# Upstream gates esp_timer_stop_blocking() on ESP_IDF_VERSION >= 6.0.0, but
+# the symbol is not exported in IDF v6.0.1. Tracked upstream as
+# espressif/esp-iot-solution#704 (fix in PR #706). Until that is merged
+# we drop the blocking variant and use esp_timer_stop() unconditionally.
+$adapterPath = Join-Path $AdapterRoot 'src/adapter/esp_lv_adapter.c'
+$adapterMarker = 'PrintSphere local patch: upstream gates esp_timer_stop_blocking'
+$adapterFind = @'
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+    ret = esp_timer_stop_blocking(timer, portMAX_DELAY);
+    if (ret == ESP_ERR_NOT_FINISHED) {
+        ret = ESP_OK;
+    }
+#else
+    ret = esp_timer_stop(timer);
+#endif
+'@
+$adapterReplace = @'
+    /* PrintSphere local patch: upstream gates esp_timer_stop_blocking() on
+     * ESP_IDF_VERSION >= 6.0.0, but the symbol is not exported in IDF v6.0.1.
+     * Tracked upstream as espressif/esp-iot-solution#704 (fix in PR #706).
+     * Use the non-blocking variant unconditionally; the timer is one-shot/
+     * periodic LVGL tick, so the (rare) race with an in-flight callback is
+     * harmless. */
+    ret = esp_timer_stop(timer);
+'@
+Apply-Patch -Path $adapterPath -Marker $adapterMarker -Find $adapterFind -Replace $adapterReplace -Label 'esp_lv_adapter.c (esp_timer_stop_blocking shim)'
 
 Write-Host "[adapter-patch] done."
