@@ -11,6 +11,7 @@
 #include "bsp/esp32_s3_touch_amoled_1_75.h"
 #include "printsphere/error_lookup.hpp"
 #include "printsphere/status_resolver.hpp"
+#include "printsphere/time_sync.hpp"
 
 namespace printsphere {
 
@@ -178,6 +179,9 @@ void Application::run() {
   ESP_LOGI(kTag, "Bootstrapping native PrintSphere project");
 
   ESP_ERROR_CHECK(config_store_.initialize());
+  // Apply persisted timezone before any localtime_r() consumer (UI ETA,
+  // logs, etc.). SNTP itself is started later when an IP is acquired.
+  time_sync::set_timezone_iana(config_store_.load_timezone_iana());
   ESP_ERROR_CHECK(configure_power_management());
   ESP_ERROR_CHECK(wifi_manager_.initialize_network_stack());
   ESP_ERROR_CHECK(wifi_manager_.start_setup_access_point(config_store_.load_device_name()));
@@ -295,6 +299,17 @@ void Application::run() {
         source_mode_ == SourceMode::kHybrid && local_printer_enabled_ && wifi_connected &&
         cloud_snapshot.configured && cloud_snapshot.session_connected &&
         (cloud_snapshot.printer_online || hybrid_cloud_printer_online_.load());
+    // Cloud is the source of truth in Hybrid mode: when we have a working
+    // cloud session AND the cloud explicitly says the printer is offline
+    // (and we haven't latched a "printer online" hint), suppress local
+    // reconnect attempts entirely. Without this gate the local printer
+    // client keeps hammering TLS handshakes against an unreachable host,
+    // which competes with the cloud MQTT task for internal heap and stalls
+    // the very signal we'd need to clear the offline state.
+    const bool hybrid_cloud_says_offline =
+        source_mode_ == SourceMode::kHybrid && local_printer_enabled_ && wifi_connected &&
+        cloud_snapshot.configured && cloud_snapshot.session_connected &&
+        !cloud_snapshot.printer_online && !hybrid_cloud_printer_online_.load();
     if (source_mode_ == SourceMode::kHybrid) {
       if (!wifi_connected || !local_printer_enabled_) {
         hybrid_local_gate_open_ = false;
@@ -303,6 +318,11 @@ void Application::run() {
           ESP_LOGI(kTag, "Hybrid mode: cloud confirmed printer online, enabling local path");
         }
         hybrid_local_gate_open_ = true;
+      } else if (hybrid_cloud_says_offline) {
+        if (hybrid_local_gate_open_) {
+          ESP_LOGI(kTag, "Hybrid mode: cloud reports printer offline, disabling local path");
+        }
+        hybrid_local_gate_open_ = false;
       } else if (source_mode_changed || wifi_reconnected) {
         ESP_LOGI(kTag, "Hybrid mode: waiting for cloud printer-online confirmation before local path");
       }
@@ -312,7 +332,13 @@ void Application::run() {
     if (source_mode_ == SourceMode::kLocalOnly) {
       local_network_ready = wifi_connected;
     } else if (source_mode_ == SourceMode::kHybrid) {
+      // While cloud actively reports the printer as offline, drop the
+      // "stay alive once previously connected" fallback as well so the
+      // local task halts at its network_ready gate. As soon as cloud
+      // flips the printer back to online, the gate reopens and the
+      // presence callback collapses any pending backoff.
       local_network_ready = wifi_connected && local_printer_enabled_ &&
+                            !hybrid_cloud_says_offline &&
                             (hybrid_local_gate_open_ || local_snapshot.local_connected);
     }
     printer_client_.set_network_ready(local_network_ready);

@@ -19,6 +19,7 @@ idf_component_register(
         "src/debug_log_buffer.cpp"
         "src/setup_portal.cpp"
         "src/status_resolver.cpp"
+        "src/time_sync.cpp"
         "src/ui.cpp"
         "src/wifi_manager.cpp"
     INCLUDE_DIRS
@@ -39,6 +40,7 @@ idf_component_register(
         esp_http_server
         mqtt
         esp_netif
+        lwip
         espressif__esp_new_jpeg
         esp-tls
         esp_wifi

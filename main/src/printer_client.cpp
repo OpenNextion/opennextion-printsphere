@@ -1576,11 +1576,19 @@ void PrinterClient::handle_mqtt_event(esp_mqtt_event_handle_t event) {
 
       {
         ++consecutive_mqtt_errors_;
+        // Growing backoff that mirrors the cloud client's escalation curve:
+        // we don't want to hammer an unreachable printer (printer powered off,
+        // away from the LAN, etc.) every 30 s — that competes with the cloud
+        // MQTT task for internal heap and prevents the cloud from refreshing
+        // its binding list (which is what eventually clears the gate).
         const uint32_t backoff_ms =
             consecutive_mqtt_errors_ <= 1 ? 2000U :
             consecutive_mqtt_errors_ <= 2 ? 4000U :
             consecutive_mqtt_errors_ <= 4 ? 8000U :
-            consecutive_mqtt_errors_ <= 6 ? 15000U : 30000U;
+            consecutive_mqtt_errors_ <= 6 ? 15000U :
+            consecutive_mqtt_errors_ <= 8 ? 30000U :
+            consecutive_mqtt_errors_ <= 10 ? 60000U :
+            consecutive_mqtt_errors_ <= 12 ? 120000U : 300000U;
         schedule_client_rebuild("mqtt error", backoff_ms);
       }
       break;
@@ -2720,7 +2728,21 @@ void PrinterClient::task_loop() {
       const uint32_t state_tick = connection_state_tick_.load();
       if (tick_elapsed(state_tick, now, pdMS_TO_TICKS(kDisconnectedStallMs))) {
         ESP_LOGW(kTag, "MQTT client stayed disconnected too long, forcing rebuild");
-        schedule_client_rebuild("disconnected stall");
+        // Honour the growing-backoff curve here too. Without this scaling the
+        // disconnected-stall watchdog overrides the MQTT-error backoff with
+        // the default 1.5 s rebuild delay, so an unreachable printer would
+        // keep getting hit every ~25 s no matter how many attempts already
+        // failed.
+        const uint32_t errs = consecutive_mqtt_errors_;
+        const uint32_t stall_backoff_ms =
+            errs <= 1 ? kRebuildDelayMs :
+            errs <= 2 ? 4000U :
+            errs <= 4 ? 8000U :
+            errs <= 6 ? 15000U :
+            errs <= 8 ? 30000U :
+            errs <= 10 ? 60000U :
+            errs <= 12 ? 120000U : 300000U;
+        schedule_client_rebuild("disconnected stall", stall_backoff_ms);
       }
     }
 

@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
+#include <ctime>
 #include <string>
 
 #include "misc/cache/instance/lv_image_cache.h"
@@ -47,6 +48,10 @@ constexpr int kPage3CameraHeight = 224;
 constexpr int kPage3CameraYOffset = 0;
 constexpr int kPage3NoteWithImageY = 150;
 constexpr int kPage3SubnoteWithImageY = 182;
+// Status text shown above the camera JPEG when an image is loaded.
+// Image is 224 high and centered at y=0, so its top is ~y=-112; the
+// status sits above with comfortable breathing room.
+constexpr int kPage3StatusAboveImageY = -138;
 constexpr int kAuxTempRowY = 28;
 constexpr int kSwipeThresholdPx = 24;
 constexpr int kGestureAxisLockMarginPx = 16;
@@ -854,6 +859,31 @@ std::string remaining_text(const PrinterSnapshot& snapshot) {
   return buffer;
 }
 
+// Wall-clock predicted finish time as "HH:MM". Falls back to the regular
+// remaining-duration text when SNTP has not synced yet (year < 2024) or
+// when no remaining time is reported.
+std::string eta_text(const PrinterSnapshot& snapshot) {
+  if (snapshot.ui_status == "done" || snapshot.lifecycle == PrintLifecycleState::kFinished) {
+    return "Done";
+  }
+  if (snapshot.remaining_seconds == 0) {
+    return "--:--";
+  }
+  const std::time_t now = std::time(nullptr);
+  if (now < 1700000000) {
+    // Wall clock not yet synced — fall back to duration so the row stays useful.
+    return remaining_text(snapshot);
+  }
+  const std::time_t finish = now + static_cast<std::time_t>(snapshot.remaining_seconds);
+  std::tm local{};
+  if (localtime_r(&finish, &local) == nullptr) {
+    return remaining_text(snapshot);
+  }
+  char buffer[8] = {};
+  std::snprintf(buffer, sizeof(buffer), "%02d:%02d", local.tm_hour, local.tm_min);
+  return buffer;
+}
+
 std::string preview_note_text(const PrinterSnapshot& snapshot) {
   if (snapshot.preview_blob && !snapshot.preview_blob->empty()) {
     return {};  // note hidden when cover is loaded — title takes over
@@ -905,7 +935,9 @@ std::string preview_subnote_text(const PrinterSnapshot& snapshot) {
 
 std::string camera_note_text(const PrinterSnapshot& snapshot) {
   if (snapshot.camera_blob && !snapshot.camera_blob->empty()) {
-    return {};  // note hidden when snapshot is loaded — title/subnote takes over
+    // Image loaded: show printer status (downloading / clean nozzle /
+    // printing / paused / failed / ...) above the JPEG.
+    return lifecycle_label(snapshot);
   }
   if (snapshot.connection == PrinterConnectionState::kWaitingForCredentials) {
     return "Set up printer";
@@ -929,7 +961,7 @@ std::string camera_subnote_text(const PrinterSnapshot& snapshot) {
     if (!snapshot.job_name.empty()) {
       return snapshot.job_name;
     }
-    return "Tap to refresh now";
+    return {};
   }
   if (!snapshot.job_name.empty()) {
     return snapshot.job_name;
@@ -1065,11 +1097,12 @@ esp_err_t Ui::initialize() {
   // Pin LVGL render task to core 1 so WiFi/BT on core 0 can't interrupt rendering.
   display_cfg.task_affinity = 1;
   display_cfg.rotation = BSP_DISPLAY_ROTATE_0;
-  // 24 lines * 466 * 2B = ~22KB per buffer in PSRAM. Double-buffered for
-  // tearless animation. esp_lvgl_port serializes flushes via the panel_io's
-  // on_color_trans_done callback, so the QSPI bus is naturally rate-limited
-  // and mbedTLS keeps its bandwidth (no more TLS handshake timeouts).
-  display_cfg.buffer_height_lines = 24;
+  // 48 lines per chunk avoids QSPI DMA TX underflow that full-frame
+  // PSRAM-sourced transfers caused (PSRAM cache miss latency can't refill
+  // the SPI FIFO at 80 MHz QSPI under WiFi load). Smart-wait in the BSP
+  // (one TE wait per frame) still prevents tearing because the 10 chunks
+  // are written in ~10 ms, well inside one 16.7 ms refresh.
+  display_cfg.buffer_height_lines = 0;  // 0 = use BSP default (48)
   display_cfg.double_buffer = true;
   apply_touch_rotation_flags(display_rotation_, &display_cfg);
 
@@ -1618,6 +1651,12 @@ void Ui::apply_ring_visual_locked(const PrinterSnapshot& snapshot) {
     const lv_color_t text_color = lv_color_hex(text_hex);
     lv_obj_set_style_text_color(progress_label_, text_color, 0);
     lv_obj_set_style_text_color(status_label_, text_color, 0);
+    // Camera page mirrors the main-page status line: same font/size and
+    // the same lifecycle-driven color (green while printing, red on
+    // failure, etc.) instead of a fixed white.
+    if (page3_note_ != nullptr) {
+      lv_obj_set_style_text_color(page3_note_, text_color, 0);
+    }
     last_ring_text_hex_ = text_hex;
   }
 }
@@ -1716,8 +1755,11 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
   const std::string layer = layer_text(snapshot);
   set_label_text_if_changed(layer_label_, layer);
 
-  const std::string remaining = remaining_text(snapshot);
+  const std::string remaining = show_eta_ ? eta_text(snapshot) : remaining_text(snapshot);
   set_label_text_if_changed(remaining_label_, remaining);
+  // Hide the clock-icon prefix in ETA mode — leaves more room for "HH:MM"
+  // and avoids the redundant clock-glyph + clock-time stutter.
+  set_hidden(remaining_prefix_label_, show_eta_);
 
   char temp_buffer[24] = {};
   const bool is_dual_nozzle = snapshot.active_nozzle_index >= 0;
@@ -2037,7 +2079,8 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
 
   if (camera_text_image_mode_ != has_camera_image) {
     if (has_camera_image) {
-      // Note is hidden when snapshot is loaded; subnote moves to former note position.
+      // Status note moves above the image; layer/subnote sits below.
+      lv_obj_align(page3_note_, LV_ALIGN_CENTER, 0, kPage3StatusAboveImageY);
       lv_obj_align(page3_subnote_, LV_ALIGN_CENTER, 0, kPage3NoteWithImageY);
     } else {
       lv_obj_align(page3_note_, LV_ALIGN_CENTER, 0, 0);
@@ -2576,6 +2619,9 @@ esp_err_t Ui::build_dashboard() {
                         LV_FLEX_ALIGN_CENTER);
   lv_obj_align(remaining_row_, LV_ALIGN_CENTER, 0, kRemainingRowY);
   lv_obj_clear_flag(remaining_row_, LV_OBJ_FLAG_SCROLLABLE);
+  // Tap to toggle between remaining duration and predicted finish time.
+  lv_obj_add_flag(remaining_row_, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(remaining_row_, &Ui::remaining_row_event_cb, LV_EVENT_CLICKED, this);
 
   remaining_prefix_label_ = lv_label_create(remaining_row_);
   set_label_text_if_changed(remaining_prefix_label_, kMdiClock);
@@ -2697,8 +2743,10 @@ esp_err_t Ui::build_dashboard() {
   lv_obj_set_width(page3_note_, 320);
   lv_label_set_long_mode(page3_note_, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_align(page3_note_, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_set_style_text_font(page3_note_, info20, 0);
-  lv_obj_set_style_text_color(page3_note_, lv_color_hex(0x888888), 0);
+  // Match the main-page status label (dosis32 / white) so the lifecycle status
+  // line on the camera page reads consistently across pages.
+  lv_obj_set_style_text_font(page3_note_, dosis32, 0);
+  lv_obj_set_style_text_color(page3_note_, lv_color_hex(0xFFFFFF), 0);
   lv_obj_align(page3_note_, LV_ALIGN_CENTER, 0, 0);
   enable_touch_bubble(page3_note_);
 
@@ -3323,6 +3371,24 @@ void Ui::logo_event_cb(lv_event_t* event) {
   if (ui != nullptr) {
     ui->handle_logo_event(event);
   }
+}
+
+void Ui::remaining_row_event_cb(lv_event_t* event) {
+  auto* ui = static_cast<Ui*>(lv_event_get_user_data(event));
+  if (ui != nullptr) {
+    ui->handle_remaining_row_click();
+  }
+}
+
+void Ui::handle_remaining_row_click() {
+  if (scrolling_) {
+    return;
+  }
+  // We are inside an LVGL event \u2014 the lvgl_port task already holds the
+  // display lock, so no extra locking is needed before mutating widgets.
+  show_eta_ = !show_eta_;
+  // Re-apply the cached snapshot so the row updates immediately.
+  apply_snapshot_locked(last_snapshot_, false);
 }
 
 }  // namespace printsphere

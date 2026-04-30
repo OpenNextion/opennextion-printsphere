@@ -20,6 +20,7 @@
 #include "freertos/task.h"
 #include "printsphere/bambu_status.hpp"
 #include "printsphere/debug_log_buffer.hpp"
+#include "printsphere/time_sync.hpp"
 #include "printsphere/ui.hpp"
 
 namespace printsphere {
@@ -1080,6 +1081,14 @@ esp_err_t SetupPortal::start() {
   ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server_, &ams_display_uri), kTag,
                       "ams display handler failed");
 
+  httpd_uri_t timezone_uri = {};
+  timezone_uri.uri = "/api/timezone";
+  timezone_uri.method = HTTP_POST;
+  timezone_uri.handler = &SetupPortal::handle_timezone_post;
+  timezone_uri.user_ctx = this;
+  ESP_RETURN_ON_ERROR(httpd_register_uri_handler(server_, &timezone_uri), kTag,
+                      "timezone handler failed");
+
   httpd_uri_t cloud_connect_uri = {};
   cloud_connect_uri.uri = "/api/cloud/connect";
   cloud_connect_uri.method = HTTP_POST;
@@ -1883,6 +1892,36 @@ esp_err_t SetupPortal::handle_root(httpd_req_t* request) {
     html += "<div class=\"micro hidden\" id=\"ams-display-apply-hint\">AMS display settings apply after the ESP restarts.</div></div>";
     end_settings_panel();
 
+    {
+      const std::string saved_tz = portal->config_store_.load_timezone_iana();
+      const std::string tz_badge_value = saved_tz.empty() ? "Auto" : saved_tz;
+      begin_settings_panel(
+          "Time Zone",
+          "Local time used for the on-screen ETA. Auto-detected from your browser when unset.",
+          tz_badge_value, "info", false);
+      html += "<div class=\"field\"><label for=\"tz_iana\">Time Zone (IANA)</label><select id=\"tz_iana\">";
+      html += "<option value=\"\"";
+      if (saved_tz.empty()) {
+        html += " selected";
+      }
+      html += ">Auto (browser)</option>";
+      for (const auto& zone : time_sync::supported_iana_zones()) {
+        html += "<option value=\"";
+        html.append(zone.data(), zone.size());
+        html += "\"";
+        if (saved_tz == zone) {
+          html += " selected";
+        }
+        html += ">";
+        html.append(zone.data(), zone.size());
+        html += "</option>";
+      }
+      html += "</select></div>";
+      html += "<div class=\"actions\"><button type=\"button\" class=\"primary hidden\" id=\"tz-apply-button\">Apply</button>";
+      html += "<div class=\"micro\" id=\"tz-detected-hint\"></div></div>";
+      end_settings_panel();
+    }
+
     if (show_connection_steps) {
       begin_settings_panel(
           "Connection Mode",
@@ -2281,6 +2320,9 @@ esp_err_t SetupPortal::handle_root(httpd_req_t* request) {
   html += filament_wake ? "true" : "false";
   html += ",filament_anim:";
   html += filament_anim ? "true" : "false";
+  html += ",tz_iana:\"";
+  html += json_escape(portal->config_store_.load_timezone_iana());
+  html += "\"";
   html += "};";
   html += "function setStatus(line,detail,lockMs){statusEl.textContent=line||'';statusDetailEl.textContent=detail||'';"
           "statusLockUntil=lockMs?Date.now()+lockMs:0;}";
@@ -2552,6 +2594,26 @@ esp_err_t SetupPortal::handle_root(httpd_req_t* request) {
               "updateAmsDisplayControls();setStatus('Saved. Restarting ESP...','The connection will drop briefly during reboot.',30000);}"
           "else{setStatus(body.error||'AMS display change failed',body.detail||'The AMS display settings could not be saved.',8000);amsDisplayApplyButton.disabled=false;updateAmsDisplayControls();}}"
           "catch(error){setStatus('AMS display change failed','The request to the ESP could not be completed.',8000);amsDisplayApplyButton.disabled=false;updateAmsDisplayControls();}});}";
+  // Time zone panel: pre-fill the dropdown from the browser when no value is
+  // saved yet, then enable the Apply button only after the user changes it.
+  html += "{const tzSelect=document.getElementById('tz_iana');"
+          "const tzApply=document.getElementById('tz-apply-button');"
+          "const tzHint=document.getElementById('tz-detected-hint');"
+          "let tzBrowser='';try{tzBrowser=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(e){}"
+          "function tzInitialPick(){if(!tzSelect)return '';const saved=savedConfig.tz_iana||'';if(saved)return saved;"
+          "if(tzBrowser){for(const o of tzSelect.options){if(o.value===tzBrowser)return tzBrowser;}}return '';}"
+          "function tzUpdateControls(){if(!tzSelect||!tzApply)return;const cur=tzSelect.value;const saved=savedConfig.tz_iana||'';"
+          "if(cur!==saved){tzApply.classList.remove('hidden');tzApply.disabled=false;}else{tzApply.classList.add('hidden');}}"
+          "if(tzSelect){const pick=tzInitialPick();if(pick&&!savedConfig.tz_iana){tzSelect.value=pick;}"
+          "if(tzHint){if(tzBrowser){tzHint.textContent='Browser detected: '+tzBrowser+(savedConfig.tz_iana?'':' (pre-selected)');}else{tzHint.textContent='Browser timezone could not be detected.';}}"
+          "tzSelect.addEventListener('change',tzUpdateControls);tzUpdateControls();}"
+          "if(tzApply){tzApply.addEventListener('click',async()=>{const tz_iana=tzSelect?tzSelect.value:'';"
+          "tzApply.disabled=true;setStatus('Applying time zone...','Saving and switching local time now (no reboot).',8000);"
+          "try{const response=await fetch('/api/timezone',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tz_iana})});"
+          "const body=await response.json().catch(()=>({}));"
+          "if(response.ok){savedConfig.tz_iana=tz_iana;tzUpdateControls();setStatus('Time zone saved.','Local time is now '+(tz_iana||'UTC')+'.',4000);}"
+          "else{setStatus(body.error||'Time zone change failed','The new time zone could not be saved.',6000);tzApply.disabled=false;tzUpdateControls();}}"
+          "catch(error){setStatus('Time zone change failed','The request to the ESP could not be completed.',6000);tzApply.disabled=false;tzUpdateControls();}});}}";
   html += "if(batDimSelect){batDimSelect.addEventListener('change',updateBatDisplayControls);}";
   html += "if(batDimBrightnessSelect){batDimBrightnessSelect.addEventListener('change',updateBatDisplayControls);}";
   html += "if(batOffSelect){batOffSelect.addEventListener('change',updateBatDisplayControls);}";
@@ -3111,6 +3173,7 @@ esp_err_t SetupPortal::handle_config_get(httpd_req_t* request) {
   body += portal->config_store_.load_filament_wake_enabled() ? "true" : "false";
   body += ",\"filament_anim\":";
   body += portal->config_store_.load_filament_anim_enabled() ? "true" : "false";
+  body += ",\"tz_iana\":\"" + json_escape(portal->config_store_.load_timezone_iana()) + "\"";
   body += "}";
 
   send_json(request, body);
@@ -3508,6 +3571,38 @@ esp_err_t SetupPortal::handle_ams_display_post(httpd_req_t* request) {
   }
 
   send_json(request, "{\"status\":\"saved\",\"rebooting\":true}");
+  return ESP_OK;
+}
+
+esp_err_t SetupPortal::handle_timezone_post(httpd_req_t* request) {
+  auto* portal = static_cast<SetupPortal*>(request->user_ctx);
+  if (portal == nullptr) {
+    return ESP_FAIL;
+  }
+  if (!portal->is_request_authorized(request)) {
+    return portal->send_locked_response(request);
+  }
+
+  cJSON* root = nullptr;
+  esp_err_t parse_err = receive_json_body(request, &root);
+  if (parse_err != ESP_OK) {
+    return parse_err;
+  }
+  std::string tz_iana = trim_copy(read_string_field(root, "tz_iana"));
+  cJSON_Delete(root);
+
+  // Validate against the curated list. Empty value is allowed (clears to UTC).
+  if (!tz_iana.empty() && time_sync::iana_to_posix(tz_iana).empty()) {
+    return httpd_resp_send_err(request, HTTPD_400_BAD_REQUEST, "unsupported timezone");
+  }
+
+  ESP_LOGI(kTag, "Saving timezone: '%s'", tz_iana.c_str());
+  ESP_RETURN_ON_ERROR(portal->config_store_.save_timezone_iana(tz_iana), kTag,
+                      "save timezone failed");
+  // Apply immediately — no reboot required for localtime_r() consumers.
+  time_sync::set_timezone_iana(tz_iana);
+
+  send_json(request, "{\"status\":\"saved\"}");
   return ESP_OK;
 }
 

@@ -340,6 +340,14 @@ esp_err_t ConfigStore::save_filament_anim_enabled(bool enabled) const {
   return save_string("fil_anim", enabled ? "1" : "0");
 }
 
+std::string ConfigStore::load_timezone_iana() const {
+  return load_string("tz_iana");
+}
+
+esp_err_t ConfigStore::save_timezone_iana(const std::string& iana_name) const {
+  return save_string("tz_iana", iana_name);
+}
+
 esp_err_t ConfigStore::save_arc_color_scheme(const ArcColorScheme& colors) const {
   ESP_RETURN_ON_ERROR(save_string("arc_print", color_to_html_hex(colors.printing)), kTag,
                       "save printing color failed");

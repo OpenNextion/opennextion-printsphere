@@ -148,8 +148,12 @@ esp_err_t P1sCameraClient::start() {
     return ESP_OK;
   }
 
-  const BaseType_t result =
-      xTaskCreate(&P1sCameraClient::task_entry, "p1s_camera", 12288, this, 4, &task_handle_);
+  // Place task stack in PSRAM. By the time start() is called, internal RAM is
+  // fragmented (Wi-Fi + Cloud MQTT TLS + 44 KB rotation staging) and a 12 KiB
+  // contiguous internal-RAM stack allocation reliably fails.
+  const BaseType_t result = xTaskCreateWithCaps(
+      &P1sCameraClient::task_entry, "p1s_camera", 12288, this, 4, &task_handle_,
+      MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   return result == pdPASS ? ESP_OK : ESP_FAIL;
 }
 

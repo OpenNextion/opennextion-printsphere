@@ -90,6 +90,8 @@ class Ui {
   static void pager_event_cb(lv_event_t* event);
   static void screen_event_cb(lv_event_t* event);
   static void logo_event_cb(lv_event_t* event);
+  static void remaining_row_event_cb(lv_event_t* event);
+  void handle_remaining_row_click();
 
   bool initialized_ = false;
   lv_display_t* display_ = nullptr;
@@ -198,6 +200,10 @@ class Ui {
   bool ring_animation_active_ = false;
   bool swipe_switched_ = false;
   bool pager_scroll_locked_ = false;
+  // Toggled by tapping the remaining-time row on page1: when true the row
+  // shows the predicted finish wall-clock time instead of the remaining
+  // duration. The clock-icon prefix is hidden in ETA mode to make room.
+  bool show_eta_ = false;
   uint8_t active_ring_anim_kind_ = 0;
   uint32_t pulse_base_hex_ = 0;
   bool pulse_both_parts_ = false;

@@ -218,6 +218,7 @@ class BambuCloudClient {
   bool authenticate_with_tfa_code(const std::string& code);
   bool ensure_cloud_mqtt_identity();
   bool ensure_mqtt_client_started();
+  void arm_mqtt_start_backoff(const char* reason);
   void request_initial_sync();
   bool publish_request(const char* payload);
   void handle_report_payload(const char* payload, size_t length);
@@ -318,6 +319,13 @@ class BambuCloudClient {
   std::atomic<int> mqtt_auth_connect_return_code_{
       static_cast<int>(MQTT_CONNECTION_ACCEPTED)};
   std::atomic<int64_t> mqtt_auth_retry_not_before_us_{0};
+  // Exponential backoff applied when esp_mqtt_client_init/start fails (most
+  // commonly because internal heap is too low to spawn the 10 KB MQTT task,
+  // e.g. when the printer is off and many transports queue up). Without this
+  // gate the cloud task would call esp_mqtt_client_start() ~once per second
+  // and spam the log with "Error create mqtt task".
+  std::atomic<int64_t> mqtt_start_backoff_until_us_{0};
+  uint32_t mqtt_start_backoff_attempts_{0};
   std::atomic<int> cloud_payload_probe_logs_remaining_{3};
   mutable std::mutex auth_mutex_{};
   AuthMode auth_mode_ = AuthMode::kPassword;

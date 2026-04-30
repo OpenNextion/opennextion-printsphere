@@ -11,6 +11,8 @@
 #include "esp_mac.h"
 #include "esp_wifi.h"
 
+#include "printsphere/time_sync.hpp"
+
 namespace printsphere {
 
 namespace {
@@ -328,6 +330,8 @@ void WifiManager::on_ip_event(int32_t event_id, void* event_data) {
   sta_disconnect_retries_ = 0;
   sta_ip_ = ip_buffer;
   ESP_LOGI(kTag, "Wi-Fi connected, IP=%s", sta_ip_.c_str());
+
+  time_sync::start_sntp_if_needed();
 
   const esp_err_t ap_err = set_setup_access_point_enabled(false);
   if (ap_err != ESP_OK) {

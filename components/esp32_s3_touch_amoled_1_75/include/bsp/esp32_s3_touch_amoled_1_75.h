@@ -56,6 +56,7 @@
 #define BSP_LCD_RST           (GPIO_NUM_39)
 #define BSP_LCD_TOUCH_RST     (GPIO_NUM_40)
 #define BSP_LCD_TOUCH_INT     (GPIO_NUM_11)
+#define BSP_LCD_TE            (GPIO_NUM_13)  /* CO5300 Tearing Effect output */
 
 /* uSD card */
 #define BSP_SD_D0            (GPIO_NUM_3)
@@ -280,6 +281,13 @@ typedef struct {
     uint32_t buffer_height_lines;
     bool double_buffer;    /*!< Allocate two LVGL draw buffers in PSRAM */
 
+    /* Tearing-Effect synchronization. When enabled, the rotation_panel waits
+     * for a rising edge on te_gpio before pushing each LVGL flush to the
+     * panel. CO5300's `0x35 0x00` mode is enabled in the init sequence. */
+    bool te_sync_enabled;
+    int te_gpio;           /*!< GPIO pin carrying the panel TE signal (-1 = unused) */
+    uint32_t te_timeout_ms;/*!< Backstop timeout if TE pulse fails (default 50) */
+
     struct {
         unsigned int swap_xy;  /*!< Swap X and Y after read coordinates */
         unsigned int mirror_x; /*!< Mirror X after read coordinates */
@@ -297,6 +305,9 @@ typedef struct {
     .rotation = BSP_DISPLAY_ROTATE_0,              \
     .buffer_height_lines = 0,                      \
     .double_buffer = true,                         \
+    .te_sync_enabled = true,                       \
+    .te_gpio = BSP_LCD_TE,                         \
+    .te_timeout_ms = 50,                           \
     .touch_flags = {                               \
         .swap_xy = 0,                              \
         .mirror_x = 1,                             \

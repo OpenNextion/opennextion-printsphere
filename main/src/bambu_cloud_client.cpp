@@ -2605,6 +2605,27 @@ bool BambuCloudClient::ensure_cloud_mqtt_identity() {
   return true;
 }
 
+void BambuCloudClient::arm_mqtt_start_backoff(const char* reason) {
+  // Exponential backoff: 5s, 10s, 20s, 40s, capped at 60s. The attempt counter
+  // is reset on a successful start (see ensure_mqtt_client_started()).
+  ++mqtt_start_backoff_attempts_;
+  static constexpr int64_t kStepUs[] = {
+      5 * 1000 * 1000LL,
+      10 * 1000 * 1000LL,
+      20 * 1000 * 1000LL,
+      40 * 1000 * 1000LL,
+      60 * 1000 * 1000LL,
+  };
+  const size_t idx = mqtt_start_backoff_attempts_ - 1 < (sizeof(kStepUs) / sizeof(kStepUs[0]))
+                         ? mqtt_start_backoff_attempts_ - 1
+                         : (sizeof(kStepUs) / sizeof(kStepUs[0])) - 1;
+  const int64_t delay_us = kStepUs[idx];
+  mqtt_start_backoff_until_us_.store(esp_timer_get_time() + delay_us);
+  ESP_LOGW(kTag, "Cloud MQTT %s failed (attempt %u) — backing off for %lld s",
+           reason ? reason : "?", static_cast<unsigned>(mqtt_start_backoff_attempts_),
+           static_cast<long long>(delay_us / 1000000));
+}
+
 bool BambuCloudClient::ensure_mqtt_client_started() {
   const std::string serial = !resolved_serial_.empty() ? resolved_serial_ : requested_serial_;
   if (!network_ready_.load() || access_token_.empty() || mqtt_username_.empty() || serial.empty()) {
@@ -2615,6 +2636,17 @@ bool BambuCloudClient::ensure_mqtt_client_started() {
     }
     stop_mqtt_client();
     return false;
+  }
+
+  // Honour the start-failure backoff (printer-off / low-heap scenario). We
+  // only block when the client is currently absent — an existing connected
+  // client must never be torn down by this gate.
+  if (mqtt_client_ == nullptr) {
+    const int64_t now_us = esp_timer_get_time();
+    const int64_t backoff_until = mqtt_start_backoff_until_us_.load();
+    if (backoff_until != 0 && now_us < backoff_until) {
+      return false;
+    }
   }
 
   const std::string desired_report_topic = "device/" + serial + "/report";
@@ -2655,6 +2687,7 @@ bool BambuCloudClient::ensure_mqtt_client_started() {
   if (mqtt_client_ == nullptr) {
     ESP_LOGW(kTag, "Failed to create Bambu Cloud MQTT client");
     log_heap_diag("cloud mqtt client init failed");
+    arm_mqtt_start_backoff("init");
     return false;
   }
   log_heap_diag("cloud mqtt after client init");
@@ -2666,9 +2699,14 @@ bool BambuCloudClient::ensure_mqtt_client_started() {
     esp_mqtt_client_destroy(mqtt_client_);
     mqtt_client_ = nullptr;
     log_heap_diag("cloud mqtt client start failed");
+    arm_mqtt_start_backoff("start");
     return false;
   }
   log_heap_diag("cloud mqtt after client start");
+
+  // Successful start: clear any previous failure backoff.
+  mqtt_start_backoff_attempts_ = 0;
+  mqtt_start_backoff_until_us_.store(0);
 
   ESP_LOGI(kTag, "Connecting to Bambu Cloud MQTT %s:%u (serial=%s, user=%s)", mqtt_host,
            static_cast<unsigned int>(kCloudMqttPort), serial.c_str(), mqtt_username_.c_str());

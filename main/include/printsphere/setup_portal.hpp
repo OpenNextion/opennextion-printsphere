@@ -62,6 +62,7 @@ class SetupPortal {
   static esp_err_t handle_battery_display_post(httpd_req_t* request);
   static esp_err_t handle_portal_access_post(httpd_req_t* request);
   static esp_err_t handle_ams_display_post(httpd_req_t* request);
+  static esp_err_t handle_timezone_post(httpd_req_t* request);
   static esp_err_t handle_cloud_connect(httpd_req_t* request);
   static esp_err_t handle_cloud_verify(httpd_req_t* request);
   static esp_err_t handle_local_connect(httpd_req_t* request);

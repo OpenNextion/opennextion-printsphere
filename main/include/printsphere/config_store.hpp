@@ -127,6 +127,9 @@ class ConfigStore {
   bool load_filament_anim_enabled() const;
   ArcColorScheme load_arc_color_scheme() const;
   BatteryDisplayPolicy load_battery_display_policy() const;
+  // IANA timezone name (e.g. "Europe/Berlin"). Empty when never configured;
+  // callers should fall back to a sensible default (handled in time_sync).
+  std::string load_timezone_iana() const;
 
   esp_err_t save_wifi_credentials(const WifiCredentials& credentials) const;
   esp_err_t save_cloud_credentials(const BambuCloudCredentials& credentials) const;
@@ -137,6 +140,7 @@ class ConfigStore {
   esp_err_t save_portal_lock_enabled(bool enabled) const;
   esp_err_t save_filament_wake_enabled(bool enabled) const;
   esp_err_t save_filament_anim_enabled(bool enabled) const;
+  esp_err_t save_timezone_iana(const std::string& iana_name) const;
   std::vector<PrinterProfile> load_printer_profiles() const;
   esp_err_t save_printer_profile(const PrinterProfile& profile) const;
   esp_err_t delete_printer_profile(uint8_t index) const;
