@@ -1608,29 +1608,32 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
   for (const auto& info : cards) {
     // Card container — glasmorphism-lite: semi-transparent bg + shadow elevation
     lv_obj_t* card = lv_obj_create(page0_card_list_);
-    lv_obj_set_size(card, 340, LV_SIZE_CONTENT);
-    lv_obj_set_style_min_height(card, 72, 0);
-    lv_obj_set_style_bg_color(card, lv_color_hex(0x1E1E1E), 0);
-    lv_obj_set_style_bg_opa(card, 195, 0);
-    lv_obj_set_style_radius(card, 16, 0);
-    lv_obj_set_style_pad_all(card, 12, 0);
+    lv_obj_set_size(card, kOnxUiLayout ? 296 : 340, LV_SIZE_CONTENT);
+    lv_obj_set_style_min_height(card, kOnxUiLayout ? 76 : 72, 0);
+    lv_obj_set_style_bg_color(card,
+                              lv_color_hex(kOnxUiLayout ? kOnxColorPanel2 : 0x1E1E1E), 0);
+    lv_obj_set_style_bg_opa(card, kOnxUiLayout ? LV_OPA_COVER : 195, 0);
+    lv_obj_set_style_radius(card, kOnxUiLayout ? 8 : 16, 0);
+    lv_obj_set_style_pad_all(card, kOnxUiLayout ? 10 : 12, 0);
     lv_obj_set_style_pad_row(card, 2, 0);
     lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
     // Shadow for 3D depth on OLED
-    lv_obj_set_style_shadow_width(card, 20, 0);
+    lv_obj_set_style_shadow_width(card, kOnxUiLayout ? 0 : 20, 0);
     lv_obj_set_style_shadow_color(card, lv_color_hex(0x000000), 0);
     lv_obj_set_style_shadow_opa(card, LV_OPA_50, 0);
     lv_obj_set_style_shadow_offset_y(card, 6, 0);
 
     if (info.active) {
-      lv_obj_set_style_border_color(card, lv_color_hex(0x00CC66), 0);
+      lv_obj_set_style_border_color(card,
+                                    lv_color_hex(kOnxUiLayout ? 0x4ADE80 : 0x00CC66), 0);
       lv_obj_set_style_border_width(card, 2, 0);
       lv_obj_set_style_border_opa(card, LV_OPA_COVER, 0);
     } else {
       // Subtle border to define card edges on dark background
-      lv_obj_set_style_border_color(card, lv_color_hex(0x303030), 0);
+      lv_obj_set_style_border_color(card,
+                                    lv_color_hex(kOnxUiLayout ? kOnxColorLine : 0x303030), 0);
       lv_obj_set_style_border_width(card, 1, 0);
-      lv_obj_set_style_border_opa(card, LV_OPA_60, 0);
+      lv_obj_set_style_border_opa(card, kOnxUiLayout ? LV_OPA_COVER : LV_OPA_60, 0);
     }
 
     lv_obj_add_flag(card, LV_OBJ_FLAG_CLICKABLE);
@@ -1641,7 +1644,9 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
     lv_obj_set_size(dot, 10, 10);
     lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color(dot, info.connected ? lv_color_hex(0x00CC66) : lv_color_hex(0x666666), 0);
+    lv_obj_set_style_bg_color(dot, info.connected
+                                   ? lv_color_hex(kOnxUiLayout ? 0x4ADE80 : 0x00CC66)
+                                   : lv_color_hex(0x666666), 0);
     lv_obj_set_style_border_width(dot, 0, 0);
     lv_obj_align(dot, LV_ALIGN_TOP_RIGHT, 0, 0);
     lv_obj_clear_flag(dot, LV_OBJ_FLAG_CLICKABLE);
@@ -1653,28 +1658,31 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
     lv_obj_t* name_lbl = lv_label_create(card);
     const std::string display_name = info.name.empty() ? info.model : info.name;
     set_label_text_if_changed(name_lbl, display_name);
-    lv_obj_set_width(name_lbl, 300);
+    lv_obj_set_width(name_lbl, kOnxUiLayout ? 250 : 300);
     lv_label_set_long_mode(name_lbl, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(name_lbl, font_name, 0);
-    lv_obj_set_style_text_color(name_lbl, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_text_color(name_lbl,
+                                lv_color_hex(kOnxUiLayout ? kOnxColorText : 0xFFFFFF), 0);
     lv_obj_align(name_lbl, LV_ALIGN_TOP_LEFT, 0, 0);
 
     // Model
     lv_obj_t* model_lbl = lv_label_create(card);
     set_label_text_if_changed(model_lbl, info.model.empty() ? "Unknown" : info.model);
-    lv_obj_set_width(model_lbl, 300);
+    lv_obj_set_width(model_lbl, kOnxUiLayout ? 260 : 300);
     lv_label_set_long_mode(model_lbl, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(model_lbl, font_detail, 0);
-    lv_obj_set_style_text_color(model_lbl, lv_color_hex(0x888888), 0);
+    lv_obj_set_style_text_color(model_lbl,
+                                lv_color_hex(kOnxUiLayout ? kOnxColorMuted : 0x888888), 0);
     lv_obj_align_to(model_lbl, name_lbl, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 2);
 
     // Host IP
     lv_obj_t* host_lbl = lv_label_create(card);
     set_label_text_if_changed(host_lbl, info.host.empty() ? "No local IP" : info.host);
-    lv_obj_set_width(host_lbl, 300);
+    lv_obj_set_width(host_lbl, kOnxUiLayout ? 260 : 300);
     lv_label_set_long_mode(host_lbl, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(host_lbl, font_detail, 0);
-    lv_obj_set_style_text_color(host_lbl, lv_color_hex(0x666666), 0);
+    lv_obj_set_style_text_color(host_lbl,
+                                lv_color_hex(kOnxUiLayout ? kOnxColorMuted : 0x666666), 0);
     lv_obj_align_to(host_lbl, model_lbl, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 2);
 
     PrinterCardWidgets cw;
@@ -3149,10 +3157,18 @@ esp_err_t Ui::build_dashboard() {
   lv_obj_set_style_text_font(page0_title_, dosis32, 0);
   lv_obj_set_style_text_color(page0_title_, lv_color_hex(0xFFFFFF), 0);
   lv_obj_align(page0_title_, LV_ALIGN_TOP_MID, 0, 60);
+  if (kOnxUiLayout) {
+    lv_obj_add_flag(page0_title_, LV_OBJ_FLAG_HIDDEN);
+  }
 
   page0_card_list_ = lv_obj_create(page0_);
-  lv_obj_set_size(page0_card_list_, 380, 300);
-  lv_obj_align(page0_card_list_, LV_ALIGN_CENTER, 0, 20);
+  if (kOnxUiLayout) {
+    lv_obj_set_pos(page0_card_list_, 12, 60);
+    lv_obj_set_size(page0_card_list_, 296, 348);
+  } else {
+    lv_obj_set_size(page0_card_list_, 380, 300);
+    lv_obj_align(page0_card_list_, LV_ALIGN_CENTER, 0, 20);
+  }
   make_transparent(page0_card_list_);
   lv_obj_set_flex_flow(page0_card_list_, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_flex_align(page0_card_list_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -3163,12 +3179,18 @@ esp_err_t Ui::build_dashboard() {
 
   page0_empty_note_ = lv_label_create(page0_);
   set_label_text_if_changed(page0_empty_note_, "No printers configured.\nUse the web portal to add printers.");
-  lv_obj_set_width(page0_empty_note_, 320);
+  lv_obj_set_width(page0_empty_note_, kOnxUiLayout ? 296 : 320);
   lv_label_set_long_mode(page0_empty_note_, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_align(page0_empty_note_, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_style_text_font(page0_empty_note_, info20, 0);
-  lv_obj_set_style_text_color(page0_empty_note_, lv_color_hex(0x666666), 0);
-  lv_obj_align(page0_empty_note_, LV_ALIGN_CENTER, 0, 20);
+  lv_obj_set_style_text_color(page0_empty_note_,
+                              lv_color_hex(kOnxUiLayout ? kOnxColorMuted : 0x666666), 0);
+  if (kOnxUiLayout) {
+    lv_obj_set_pos(page0_empty_note_, 12, 180);
+    lv_obj_set_size(page0_empty_note_, 296, 100);
+  } else {
+    lv_obj_align(page0_empty_note_, LV_ALIGN_CENTER, 0, 20);
+  }
   lv_obj_add_flag(page0_empty_note_, LV_OBJ_FLAG_HIDDEN);
 
   // --- AMS pages (one per AMS unit, indices kPageIdxAmsFirst..kPageIdxAmsLast) ---
