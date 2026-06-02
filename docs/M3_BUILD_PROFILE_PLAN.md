@@ -337,11 +337,23 @@ Current verification status:
   `main/src/ui.cpp` included `-DPRINTSPHERE_BOARD_ONX3248G035=1` and
   `components/onx3248g035_bsp/include`, confirming the ONX app profile and ONX
   BSP include path were active.
-- That follow-up build failed on the same managed adapter compatibility issue
-  plus app/UI calls to adapter pause/resume symbols:
-  `esp_timer_stop_blocking` in `esp_lv_adapter.c`, and
-  `esp_lv_adapter_pause` / `esp_lv_adapter_resume` declarations in
-  `main/src/ui.cpp`. It did not fail on the Waveshare `usb` dependency.
+- Build/Profile follow-up on 2026-06-02 reproduced the managed adapter failure
+  with the standard command:
+  `idf.py -DPRINTSPHERE_BOARD=onx3248g035 build`. Local ESP-IDF v6.0.1 exports
+  `esp_timer_stop()` in `esp_timer.h` but does not export
+  `esp_timer_stop_blocking()`.
+- The timer compatibility blocker is now patched in the project build, without
+  editing ignored `managed_components/` content: top-level CMake injects
+  `main/include/printsphere/esp_timer_compat.h` only into the
+  `espressif__esp_lvgl_adapter` target when the project-local IDF version is
+  6.0.1. The shim maps the missing `esp_timer_stop_blocking(timer, timeout)` to
+  the available `esp_timer_stop(timer)`.
+- After that patch, the same standard ONX build reconfigured successfully,
+  confirmed `PrintSphere board profile: onx3248g035`, compiled past
+  `esp_lv_adapter.c`, and stopped at the next real compile blocker:
+  `esp_lv_adapter_pause` and `esp_lv_adapter_resume` are not declared in
+  `main/src/ui.cpp`. This is now an app/UI-to-ONX-BSP LVGL lifecycle/API
+  boundary issue, not the managed adapter timer compatibility issue.
 
 Diagnostic note:
 
@@ -358,9 +370,11 @@ Diagnostic note:
   `usb`; with Component Manager disabled it stops at the expected managed
   application dependency `mqtt`.
 - Do not treat the offline diagnostic build as standard full-app acceptance.
-  The standard full build remains the Component Manager enabled command above,
-  and currently needs the LVGL adapter compatibility issue resolved before it
-  can reach app-level ONX BSP/PMU/UI validation.
+  The standard full build remains the Component Manager enabled command above.
+  Current status: the managed adapter timer compatibility issue is resolved;
+  the active blocker is exposing or abstracting the adapter pause/resume
+  lifecycle API for ONX without pulling the Waveshare BSP path back into the
+  ONX profile.
 
 ## Required Changes for M3
 
@@ -368,12 +382,10 @@ Must change:
 
 - Implement the real ONX ST7796U panel-handle and LVGL adapter path.
 - Implement the ONX CST826 `esp_lcd_touch_handle_t` and LVGL input-device path.
-- Resolve or patch the `espressif__esp_lvgl_adapter` use of
-  `esp_timer_stop_blocking` under ESP-IDF v6.0.1.
 - Align the app/UI display lifecycle calls with the ONX-compatible LVGL adapter
   API, including `esp_lv_adapter_pause` and `esp_lv_adapter_resume`.
-- Re-run the standard full PrintSphere ONX profile build after the managed LVGL
-  adapter compatibility issue is resolved.
+- Re-run the standard full PrintSphere ONX profile build after the pause/resume
+  lifecycle API boundary is resolved.
 
 Can defer:
 

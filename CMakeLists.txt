@@ -32,6 +32,18 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 idf_build_set_property(PRINTSPHERE_BOARD "${PRINTSPHERE_BOARD}")
 project(printsphere_idf)
 
+if(IDF_VERSION_MAJOR EQUAL 6 AND IDF_VERSION_MINOR EQUAL 0 AND IDF_VERSION_PATCH EQUAL 1)
+    idf_build_get_property(BUILD_COMPONENTS BUILD_COMPONENTS)
+    if("espressif__esp_lvgl_adapter" IN_LIST BUILD_COMPONENTS)
+        idf_component_get_property(ESP_LVGL_ADAPTER_LIB espressif__esp_lvgl_adapter COMPONENT_LIB)
+        if(ESP_LVGL_ADAPTER_LIB)
+            target_compile_options(${ESP_LVGL_ADAPTER_LIB} PRIVATE
+                "-include" "${CMAKE_SOURCE_DIR}/main/include/printsphere/esp_timer_compat.h"
+            )
+        endif()
+    endif()
+endif()
+
 # Work around an Xtensa GCC ICE seen in ESP-IDF 5.5.2 while compiling
 # esp_lcd_panel_rgb.c with the default debug/-Og flags on Windows.
 idf_component_get_property(ESP_LCD_DIR esp_lcd COMPONENT_DIR)
