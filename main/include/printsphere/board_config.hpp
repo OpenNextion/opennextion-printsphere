@@ -4,8 +4,13 @@
 
 namespace printsphere::board {
 
+#if defined(PRINTSPHERE_BOARD_ONX3248G035) && PRINTSPHERE_BOARD_ONX3248G035
+constexpr int kDisplayWidth = 320;
+constexpr int kDisplayHeight = 480;
+#elif defined(PRINTSPHERE_BOARD_WAVESHARE_AMOLED_1_75) && PRINTSPHERE_BOARD_WAVESHARE_AMOLED_1_75
 constexpr int kDisplayWidth = 466;
 constexpr int kDisplayHeight = 466;
+#endif
 
 constexpr gpio_num_t kI2cScl = GPIO_NUM_14;
 constexpr gpio_num_t kI2cSda = GPIO_NUM_15;
