@@ -122,6 +122,23 @@ Boundaries:
 
 When subthreads finish, the main thread must explicitly read their outputs and summarize them. Subthread completion does not automatically notify the main thread.
 
+## Reconnect / Slow Thread Rule
+
+Codex background threads can temporarily show reconnecting or appear silent during
+network interruptions. The main thread must not treat a quiet or reconnecting
+thread as failed too quickly.
+
+Rules:
+
+- Wait before judging a reconnecting or quiet thread as blocked.
+- Prefer reading thread status and checking `git status` before sending more
+  instructions.
+- Do not create a replacement thread just because the first thread has no output
+  for a short period.
+- If a replacement thread is truly needed, first pause the earlier thread and
+  document which thread is now authoritative.
+- Do not let two implementation threads edit the same files at the same time.
+
 ## Active Work
 
 - 2026-06-02: M2 ONX board bring-up started on `feature/onx-bsp-bringup`.
