@@ -4,8 +4,10 @@
 #include <stdint.h>
 
 #include "driver/gpio.h"
+#include "driver/i2c_master.h"
 #include "driver/i2c_types.h"
 #include "esp_err.h"
+#include "esp_lcd_panel_io.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -44,14 +46,17 @@ typedef struct {
 } onx_touch_point_t;
 
 esp_err_t onx_bsp_i2c_init(void);
+i2c_master_bus_handle_t onx_bsp_i2c_get_handle(void);
 esp_err_t onx_bsp_pcf8574_init(void);
 esp_err_t onx_bsp_pcf8574_write_pin(onx_pcf8574_pin_t pin, bool high);
 esp_err_t onx_bsp_pcf8574_read(uint8_t *state);
 esp_err_t onx_bsp_lcd_init(void);
+esp_lcd_panel_io_handle_t onx_bsp_lcd_get_io_handle(void);
 esp_err_t onx_bsp_lcd_fill(uint16_t rgb565);
 esp_err_t onx_bsp_lcd_fill_bars(void);
 esp_err_t onx_bsp_backlight_init(void);
 esp_err_t onx_bsp_backlight_set(uint8_t brightness_percent);
+uint8_t onx_bsp_backlight_get(void);
 esp_err_t onx_bsp_touch_init(void);
 esp_err_t onx_bsp_touch_read(onx_touch_point_t *point);
 esp_err_t onx_bsp_smoke_run(void);

@@ -24,6 +24,11 @@ firmware.
 The BSP sets the ST7796U state explicitly in
 `components/onx3248g035_bsp/src/onx3248g035_bsp.c`.
 
+- Final configuration symbols:
+  - `ONX_LCD_MADCTL_VALUE`.
+  - `ONX_LCD_COLMOD_VALUE`.
+  - `ONX_LCD_INVERT_CMD`.
+  - `lcd_pack_rgb565()`.
 - `COLMOD`: `0x55`, 16-bit RGB565 pixels.
 - `MADCTL`: `LCD_CMD_MX_BIT | LCD_CMD_BGR_BIT`, value `0x48`.
 - `MX`: enabled. The smoke firmware draws directly to GRAM, so this applies
@@ -39,6 +44,57 @@ The official ST7796U component's default vendor init sequence sends `INVON`, but
 the official board LCD initialization then calls `esp_lcd_panel_invert_color`
 with `false`, which sends `INVOFF`. The BSP sends the final `INVOFF` command
 directly at the end of the init sequence.
+
+## Final Configuration Modification Points
+
+The final LCD fix is in
+`components/onx3248g035_bsp/src/onx3248g035_bsp.c`, not in the text renderer,
+color labels, or touch target drawing code.
+
+Configuration constants:
+
+```c
+#define ONX_LCD_MADCTL_VALUE (LCD_CMD_MX_BIT | LCD_CMD_BGR_BIT)
+#define ONX_LCD_COLMOD_VALUE 0x55
+#define ONX_LCD_INVERT_CMD LCD_CMD_INVOFF
+```
+
+Initialization commands:
+
+```c
+{LCD_CMD_MADCTL, s_cmd_madctl, sizeof(s_cmd_madctl), 0}
+{LCD_CMD_COLMOD, s_cmd_colmod, sizeof(s_cmd_colmod), 0}
+{ONX_LCD_INVERT_CMD, NULL, 0, 0}
+```
+
+Pixel payload helper:
+
+```c
+static uint16_t lcd_pack_rgb565(uint16_t rgb565)
+{
+    return __builtin_bswap16(rgb565);
+}
+```
+
+Address-window commands remain standard and are not used to hide the direction
+issue:
+
+```c
+LCD_CMD_CASET: x_start to x_end - 1
+LCD_CMD_RASET: y_start to y_end - 1
+LCD_CMD_RAMWR: selected-window pixel payload
+```
+
+Why this resolves the visual defects:
+
+- `MADCTL.MX` fixes the horizontal mirror seen when drawing directly to GRAM.
+- `MADCTL.BGR` matches the ONX official BGR panel element order.
+- `INVOFF` fixes the white/black inversion produced by leaving the panel in
+  display-inversion mode.
+- `COLMOD=0x55` keeps the controller in 16-bit RGB565 mode.
+- `lcd_pack_rgb565()` is the only RGB565 SPI payload byte-order conversion
+  point, so color constants stay standard and byte order does not drift across
+  drawing helpers.
 
 ## RGB565 Bus Byte Order
 
@@ -64,6 +120,11 @@ The BSP uses standard ST7796 address windows:
 
 No x/y gap is currently applied. The smoke firmware validates the full
 `0..319`, `0..479` logical coordinate range.
+
+Do not introduce CASET/RASET gaps, coordinate offsets, or draw-time mirroring as
+a substitute for the verified MADCTL/INVOFF/RGB565 configuration above. Any
+future panel-handle or LVGL adapter path must preserve this portrait coordinate
+system unless a new hardware validation run records a different result.
 
 ## Touch
 
@@ -115,6 +176,13 @@ Intentional differences:
   first and then calling the panel API to disable inversion.
 - The smoke firmware packs RGB565 bus byte order in a single helper because it
   writes raw `uint16_t` buffers directly.
+
+Rejected approaches:
+
+- Mirroring glyph columns or touch labels in software.
+- Swapping color constants such as using `0x001F` for red.
+- Adding CASET/RASET offsets to compensate for scan direction.
+- Re-enabling `INVON` and compensating in drawing code.
 
 ## Visual Acceptance
 

@@ -70,6 +70,7 @@ static i2c_master_dev_handle_t s_pcf8574_dev;
 static i2c_master_dev_handle_t s_cst826_dev;
 static esp_lcd_panel_io_handle_t s_lcd_io;
 static uint8_t s_pcf8574_state = 0xFF;
+static uint8_t s_backlight_percent;
 static bool s_pcf8574_ready;
 static bool s_spi_bus_ready;
 static bool s_lcd_ready;
@@ -180,6 +181,14 @@ esp_err_t onx_bsp_i2c_init(void)
     return ESP_OK;
 }
 
+i2c_master_bus_handle_t onx_bsp_i2c_get_handle(void)
+{
+    if (onx_bsp_i2c_init() != ESP_OK) {
+        return NULL;
+    }
+    return s_i2c_bus;
+}
+
 esp_err_t onx_bsp_pcf8574_init(void)
 {
     ESP_RETURN_ON_ERROR(onx_bsp_i2c_init(), TAG, "I2C init failed");
@@ -275,6 +284,14 @@ esp_err_t onx_bsp_lcd_init(void)
     ESP_LOGI(TAG, "LCD init complete: ST7796 SPI %dx%d pclk=%d madctl=0x%02X colmod=0x%02X invert=off rgb565=byte_swap",
              ONX_LCD_H_RES, ONX_LCD_V_RES, ONX_LCD_PCLK_HZ, ONX_LCD_MADCTL_VALUE, ONX_LCD_COLMOD_VALUE);
     return ESP_OK;
+}
+
+esp_lcd_panel_io_handle_t onx_bsp_lcd_get_io_handle(void)
+{
+    if (onx_bsp_lcd_init() != ESP_OK) {
+        return NULL;
+    }
+    return s_lcd_io;
 }
 
 static esp_err_t lcd_draw_window(int x_start, int y_start, int x_end, int y_end, const void *color_data, size_t bytes)
@@ -610,8 +627,14 @@ esp_err_t onx_bsp_backlight_set(uint8_t brightness_percent)
     const uint32_t duty = ((uint32_t)brightness_percent * ONX_BL_LEDC_MAX_DUTY) / 100U;
     ESP_RETURN_ON_ERROR(ledc_set_duty(ONX_BL_LEDC_MODE, ONX_BL_LEDC_CHANNEL, duty), TAG, "LEDC set duty failed");
     ESP_RETURN_ON_ERROR(ledc_update_duty(ONX_BL_LEDC_MODE, ONX_BL_LEDC_CHANNEL), TAG, "LEDC update duty failed");
+    s_backlight_percent = brightness_percent;
     ESP_LOGI(TAG, "Backlight PWM set: %u%% duty=%" PRIu32, brightness_percent, duty);
     return ESP_OK;
+}
+
+uint8_t onx_bsp_backlight_get(void)
+{
+    return s_backlight_percent;
 }
 
 static esp_err_t cst826_read(uint8_t reg, uint8_t *data, size_t len)
