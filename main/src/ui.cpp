@@ -76,6 +76,23 @@ constexpr uint32_t kCardRevealStaggerMs = 55U;
 constexpr uint32_t kRingBaseDark = 0x101010;
 constexpr uint32_t kRingIdleSolid = 0x404040;
 constexpr char kDegreeC[] = "\xC2\xB0""C";
+
+#if defined(PRINTSPHERE_BOARD_ONX3248G035) && PRINTSPHERE_BOARD_ONX3248G035
+constexpr bool kOnxUiLayout = true;
+#else
+constexpr bool kOnxUiLayout = false;
+#endif
+
+constexpr int kOnxPagePad = 12;
+constexpr int kOnxContentWidth = 296;
+constexpr int kOnxTopbarY = 12;
+constexpr int kOnxTopbarHeight = 30;
+constexpr int kOnxBottomHintY = 432;
+constexpr int kOnxBottomHintHeight = 36;
+constexpr uint32_t kOnxColorBg = 0x050607;
+constexpr uint32_t kOnxColorText = 0xF7FAFC;
+constexpr uint32_t kOnxColorMuted = 0x8B98A8;
+constexpr uint32_t kOnxColorLine = 0x2D333B;
 constexpr char kMdiClock[] = "\xF3\xB1\x91\x8E";
 constexpr char kMdiNozzle[] = "\xF3\xB0\xB9\x9B";
 constexpr char kMdiBed[] = "\xF3\xB1\xA1\x9B";
@@ -260,6 +277,17 @@ void make_transparent(lv_obj_t* obj) {
   lv_obj_set_style_pad_all(obj, 0, 0);
 }
 
+void apply_page_root_style(lv_obj_t* page) {
+  if (kOnxUiLayout) {
+    lv_obj_set_style_bg_color(page, lv_color_hex(kOnxColorBg), 0);
+    lv_obj_set_style_bg_opa(page, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_opa(page, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_pad_all(page, 0, 0);
+  } else {
+    make_transparent(page);
+  }
+}
+
 void set_hidden(lv_obj_t* obj, bool hidden) {
   if (obj == nullptr) {
     return;
@@ -429,6 +457,69 @@ void set_label_text_if_changed(lv_obj_t* label, const char* text) {
 
 void set_label_text_if_changed(lv_obj_t* label, const std::string& text) {
   set_label_text_if_changed(label, text.c_str());
+}
+
+void add_onx_page_chrome(lv_obj_t* page,
+                         const char* title,
+                         const char* meta,
+                         const char* hint,
+                         const lv_font_t* title_font,
+                         const lv_font_t* hint_font) {
+  if (!kOnxUiLayout || page == nullptr) {
+    return;
+  }
+
+  lv_obj_t* topbar = lv_obj_create(page);
+  lv_obj_set_pos(topbar, kOnxPagePad, kOnxTopbarY);
+  lv_obj_set_size(topbar, kOnxContentWidth, kOnxTopbarHeight);
+  make_transparent(topbar);
+  lv_obj_clear_flag(topbar, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(topbar, LV_OBJ_FLAG_CLICKABLE);
+  enable_touch_bubble(topbar);
+
+  lv_obj_t* title_label = lv_label_create(topbar);
+  set_label_text_if_changed(title_label, title);
+  lv_obj_set_width(title_label, 220);
+  lv_label_set_long_mode(title_label, LV_LABEL_LONG_DOT);
+  lv_obj_set_style_text_font(title_label, title_font, 0);
+  lv_obj_set_style_text_color(title_label, lv_color_hex(kOnxColorText), 0);
+  lv_obj_set_style_text_align(title_label, LV_TEXT_ALIGN_LEFT, 0);
+  lv_obj_align(title_label, LV_ALIGN_LEFT_MID, 0, 0);
+
+  lv_obj_t* meta_label = lv_label_create(topbar);
+  set_label_text_if_changed(meta_label, meta);
+  lv_obj_set_width(meta_label, 68);
+  lv_label_set_long_mode(meta_label, LV_LABEL_LONG_DOT);
+  lv_obj_set_style_text_font(meta_label, hint_font, 0);
+  lv_obj_set_style_text_color(meta_label, lv_color_hex(kOnxColorMuted), 0);
+  lv_obj_set_style_text_align(meta_label, LV_TEXT_ALIGN_RIGHT, 0);
+  lv_obj_align(meta_label, LV_ALIGN_RIGHT_MID, 0, 0);
+
+  if (hint == nullptr || hint[0] == '\0') {
+    return;
+  }
+
+  lv_obj_t* hint_line = lv_obj_create(page);
+  lv_obj_set_pos(hint_line, kOnxPagePad, kOnxBottomHintY);
+  lv_obj_set_size(hint_line, kOnxContentWidth, kOnxBottomHintHeight);
+  make_transparent(hint_line);
+  lv_obj_set_style_border_color(hint_line, lv_color_hex(kOnxColorLine), 0);
+  lv_obj_set_style_border_opa(hint_line, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(hint_line, 1, 0);
+  lv_obj_set_style_border_side(hint_line, LV_BORDER_SIDE_TOP, 0);
+  lv_obj_set_style_pad_top(hint_line, 8, 0);
+  lv_obj_clear_flag(hint_line, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(hint_line, LV_OBJ_FLAG_CLICKABLE);
+  enable_touch_bubble(hint_line);
+
+  lv_obj_t* hint_label = lv_label_create(hint_line);
+  set_label_text_if_changed(hint_label, hint);
+  lv_obj_set_width(hint_label, kOnxContentWidth);
+  lv_label_set_long_mode(hint_label, LV_LABEL_LONG_DOT);
+  lv_obj_set_style_text_font(hint_label, hint_font, 0);
+  lv_obj_set_style_text_color(hint_label, lv_color_hex(kOnxColorMuted), 0);
+  lv_obj_set_style_text_align(hint_label, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_align(hint_label, LV_ALIGN_TOP_MID, 0, 0);
 }
 
 std::string optional_temperature_text(const char* label, float temperature_c, bool known = false) {
@@ -2627,7 +2718,7 @@ esp_err_t Ui::build_dashboard() {
   auto create_page = [](lv_obj_t* parent) {
     lv_obj_t* page = lv_obj_create(parent);
     lv_obj_set_size(page, board::kDisplayWidth, board::kDisplayHeight);
-    make_transparent(page);
+    apply_page_root_style(page);
     lv_obj_clear_flag(page, LV_OBJ_FLAG_SCROLLABLE);
     return page;
   };
@@ -2644,6 +2735,19 @@ esp_err_t Ui::build_dashboard() {
   enable_touch_bubble(page1_);
   enable_touch_bubble(page2_);
   enable_touch_bubble(page3_);
+
+  add_onx_page_chrome(page0_, "Printers", "1/8", "Hold: Web Config PIN", dosis20, info20);
+  for (int u = 0; u < kMaxAmsUnits; ++u) {
+    char ams_title[16] = {};
+    char ams_meta[8] = {};
+    std::snprintf(ams_title, sizeof(ams_title), "AMS %d", u + 1);
+    std::snprintf(ams_meta, sizeof(ams_meta), "%d/8", u + 2);
+    add_onx_page_chrome(ams_pages_[u], ams_title, ams_meta, "AMS trays are display-only",
+                        dosis20, info20);
+  }
+  add_onx_page_chrome(page1_, "Status", "6/8", "", dosis20, info20);
+  add_onx_page_chrome(page2_, "Cover", "7/8", "Cover image is display-only", dosis20, info20);
+  add_onx_page_chrome(page3_, "Camera", "8/8", "Tap image area to refresh", dosis20, info20);
 
   // --- Page 0: printer selection ---
   page0_title_ = lv_label_create(page0_);
