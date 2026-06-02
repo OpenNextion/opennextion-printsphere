@@ -3,7 +3,8 @@
 /*
  * Temporary PrintSphere-compatible BSP profile for ONX3248G035.
  *
- * Build/Release must select exactly one BSP component that exports bsp/*.
+ * Build/Release must select exactly one BSP component that exports the bsp
+ * include namespace.
  * Do not compile this ONX compatibility profile together with the Waveshare
  * BSP component, because both provide the same public header and symbol names.
  */

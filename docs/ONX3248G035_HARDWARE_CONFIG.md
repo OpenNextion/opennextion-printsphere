@@ -143,6 +143,12 @@ a substitute for the verified MADCTL/INVOFF/RGB565 configuration above. Any
 future panel-handle or LVGL adapter path must preserve this portrait coordinate
 system unless a new hardware validation run records a different result.
 
+The M3 LVGL adapter follows the same rule: LVGL flushes through the ONX
+`esp_lcd_panel_handle_t` wrapper, and that wrapper uses the verified LCD init
+state plus the same RGB565 byte-swap before SPI color transfer. LVGL labels,
+color bands, or touch targets must not compensate for mirror, inversion, RGB/BGR
+order, or CASET/RASET offset mistakes.
+
 ## Touch
 
 - Controller: CST826 at I2C address `0x15`.

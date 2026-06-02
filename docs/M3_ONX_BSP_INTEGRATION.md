@@ -157,15 +157,26 @@ Status:
   path and the `bsp_*` symbols is selected for a firmware.
 - `BSP_LCD_H_RES=320`, `BSP_LCD_V_RES=480`, `BSP_LCD_TOUCH_INT=GPIO_NUM_NC`,
   and ONX pin aliases are exported for the ONX profile.
-- `bsp_display_new()` initializes the verified low-level ONX LCD path and can
-  return the `esp_lcd_panel_io_handle_t`, but it deliberately returns
-  `ESP_ERR_NOT_SUPPORTED` because there is no ONX `esp_lcd_panel_handle_t` yet.
-- `bsp_display_start()` and `bsp_display_start_with_config()` deliberately
-  return `NULL` after logging the missing LVGL adapter path. This is a blocker,
-  not a fake display success.
+- `bsp_display_new()` now returns a real `esp_lcd_panel_handle_t` wrapper around
+  the verified ONX ST7796U draw-window path. The wrapper preserves the final
+  LCD init state and performs RGB565 payload byte-swap in the panel flush path.
+- `bsp_display_start()` and `bsp_display_start_with_config()` start a real LVGL
+  display when an LVGL component is present in the build. They return `NULL`
+  only when the LVGL path is not compiled in or initialization fails.
+- `components/onx3248g035_bsp/CMakeLists.txt` detects `lvgl` or `lvgl__lvgl`,
+  appends the detected component to `ONX_BSP_REQUIRES`, and links the ONX BSP
+  with `WHOLE_ARCHIVE` so the LVGL adapter symbols are not dropped by static
+  archive ordering.
+- `bsp_display_lock()` and `bsp_display_unlock()` use the ONX LVGL adapter's
+  recursive mutex when LVGL is enabled.
 - `bsp_display_rotation_set()` accepts only `BSP_DISPLAY_ROTATE_0` for the
   accepted portrait orientation. Other rotations return `ESP_ERR_NOT_SUPPORTED`
   until ST7796U and touch transforms are retested.
+- `examples/onx_bsp_lvgl_smoke` is a build-only BSP adapter smoke target for
+  this path. If selected for a later hardware run, its screen is intentionally
+  labeled with `RED`, `GREEN`, `BLUE`, `WHITE`, `BLACK`, `TOUCH TOP LEFT`,
+  `TOUCH CENTER`, and `TOUCH BOTTOM RIGHT` so users can visually validate color,
+  orientation, and touch mapping without starting PrintSphere.
 
 ### Touch
 
@@ -184,10 +195,14 @@ Target behavior:
 Status:
 
 - Raw CST826 polling is verified.
-- `bsp_touch_new()` initializes the verified raw CST826 path, clears the output
-  handle, and returns `ESP_ERR_NOT_SUPPORTED`.
-- `esp_lcd_touch` handle creation and LVGL input-device registration remain
-  M3 blockers.
+- The ONX LVGL adapter registers an LVGL pointer input device backed by the
+  verified raw CST826 polling path.
+- `bsp_display_get_input_dev()` returns the LVGL input device when the LVGL
+  adapter has started.
+- `bsp_touch_new()` still initializes the verified raw CST826 path, clears the
+  `esp_lcd_touch_handle_t` output, and returns `ESP_ERR_NOT_SUPPORTED`.
+  Creating a true `esp_lcd_touch_handle_t` remains deferred because the M3 LVGL
+  path no longer needs it to deliver pointer events.
 
 ### PMU and Power
 

@@ -14,7 +14,7 @@
 typedef struct sdmmc_card_t sdmmc_card_t;
 #endif
 
-#include "driver/spi_types.h"
+#include "hal/spi_types.h"
 #include "esp_err.h"
 
 #if __has_include("esp_lv_adapter.h")
