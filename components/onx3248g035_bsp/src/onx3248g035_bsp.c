@@ -38,6 +38,15 @@ static const char *TAG = "onx_bsp";
 #define RGB565_DARK_GRAY 0x2104
 #define RGB565_YELLOW 0xFFE0
 
+/*
+ * ONX official ST7796U examples use BGR element order and then apply a
+ * horizontal mirror in the LVGL display configuration. This smoke firmware
+ * draws directly to GRAM, so the equivalent panel-side scan setting is MX+BGR.
+ */
+#define ONX_LCD_MADCTL_VALUE (LCD_CMD_MX_BIT | LCD_CMD_BGR_BIT)
+#define ONX_LCD_COLMOD_VALUE 0x55
+#define ONX_LCD_INVERT_CMD LCD_CMD_INVOFF
+
 typedef struct {
     uint8_t cmd;
     const uint8_t *data;
@@ -73,16 +82,22 @@ static const font5x7_glyph_t s_font5x7[] = {
     {'C', {0x0E, 0x11, 0x10, 0x10, 0x10, 0x11, 0x0E}},
     {'D', {0x1E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1E}},
     {'E', {0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x1F}},
+    {'F', {0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x10}},
     {'G', {0x0E, 0x11, 0x10, 0x17, 0x11, 0x11, 0x0E}},
     {'H', {0x11, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11}},
     {'I', {0x0E, 0x04, 0x04, 0x04, 0x04, 0x04, 0x0E}},
     {'K', {0x11, 0x12, 0x14, 0x18, 0x14, 0x12, 0x11}},
     {'L', {0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1F}},
+    {'M', {0x11, 0x1B, 0x15, 0x15, 0x11, 0x11, 0x11}},
     {'N', {0x11, 0x19, 0x15, 0x13, 0x11, 0x11, 0x11}},
+    {'O', {0x0E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E}},
+    {'P', {0x1E, 0x11, 0x11, 0x1E, 0x10, 0x10, 0x10}},
     {'R', {0x1E, 0x11, 0x11, 0x1E, 0x14, 0x12, 0x11}},
     {'T', {0x1F, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04}},
     {'U', {0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E}},
     {'W', {0x11, 0x11, 0x11, 0x15, 0x15, 0x15, 0x0A}},
+    {'X', {0x11, 0x11, 0x0A, 0x04, 0x0A, 0x11, 0x11}},
+    {'Y', {0x11, 0x11, 0x0A, 0x04, 0x04, 0x04, 0x04}},
 };
 
 static const touch_target_t s_touch_targets[] = {
@@ -93,7 +108,8 @@ static const touch_target_t s_touch_targets[] = {
     {"CENTER", 160, 240},
 };
 
-static const uint8_t s_cmd_colmod[] = {0x55};
+static const uint8_t s_cmd_madctl[] = {ONX_LCD_MADCTL_VALUE};
+static const uint8_t s_cmd_colmod[] = {ONX_LCD_COLMOD_VALUE};
 static const uint8_t s_cmd_f0_c3[] = {0xC3};
 static const uint8_t s_cmd_f0_96[] = {0x96};
 static const uint8_t s_cmd_b4[] = {0x01};
@@ -116,6 +132,7 @@ static const uint8_t s_cmd_f0_69[] = {0x69};
 
 static const onx_lcd_init_cmd_t s_lcd_init_cmds[] = {
     {LCD_CMD_SLPOUT, NULL, 0, 120},
+    {LCD_CMD_MADCTL, s_cmd_madctl, sizeof(s_cmd_madctl), 0},
     {LCD_CMD_COLMOD, s_cmd_colmod, sizeof(s_cmd_colmod), 0},
     {0xF0, s_cmd_f0_c3, sizeof(s_cmd_f0_c3), 0},
     {0xF0, s_cmd_f0_96, sizeof(s_cmd_f0_96), 0},
@@ -130,7 +147,7 @@ static const onx_lcd_init_cmd_t s_lcd_init_cmds[] = {
     {0xE1, s_cmd_e1, sizeof(s_cmd_e1), 0},
     {0xF0, s_cmd_f0_3c, sizeof(s_cmd_f0_3c), 0},
     {0xF0, s_cmd_f0_69, sizeof(s_cmd_f0_69), 120},
-    {LCD_CMD_INVON, NULL, 0, 0},
+    {ONX_LCD_INVERT_CMD, NULL, 0, 0},
     {LCD_CMD_DISPON, NULL, 0, 0},
 };
 
@@ -255,7 +272,8 @@ esp_err_t onx_bsp_lcd_init(void)
     ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)ONX_LCD_HOST, &io_config, &s_lcd_io), TAG, "LCD IO init failed");
     ESP_RETURN_ON_ERROR(lcd_send_cmds(), TAG, "ST7796 init sequence failed");
     s_lcd_ready = true;
-    ESP_LOGI(TAG, "LCD init complete: ST7796 SPI %dx%d pclk=%d", ONX_LCD_H_RES, ONX_LCD_V_RES, ONX_LCD_PCLK_HZ);
+    ESP_LOGI(TAG, "LCD init complete: ST7796 SPI %dx%d pclk=%d madctl=0x%02X colmod=0x%02X invert=off rgb565=byte_swap",
+             ONX_LCD_H_RES, ONX_LCD_V_RES, ONX_LCD_PCLK_HZ, ONX_LCD_MADCTL_VALUE, ONX_LCD_COLMOD_VALUE);
     return ESP_OK;
 }
 
@@ -281,6 +299,11 @@ static esp_err_t lcd_draw_window(int x_start, int y_start, int x_end, int y_end,
     ESP_RETURN_ON_ERROR(esp_lcd_panel_io_tx_param(s_lcd_io, LCD_CMD_RASET, raset, sizeof(raset)), TAG, "RASET failed");
     ESP_RETURN_ON_ERROR(esp_lcd_panel_io_tx_color(s_lcd_io, LCD_CMD_RAMWR, color_data, bytes), TAG, "RAMWR failed");
     return ESP_OK;
+}
+
+static uint16_t lcd_pack_rgb565(uint16_t rgb565)
+{
+    return __builtin_bswap16(rgb565);
 }
 
 static const uint8_t *font5x7_find(char letter)
@@ -331,8 +354,9 @@ static esp_err_t onx_bsp_lcd_draw_rect(int x, int y, int w, int h, uint16_t rgb5
     const int pixels = w * ((h < chunk_rows_max) ? h : chunk_rows_max);
     uint16_t *buffer = heap_caps_malloc(pixels * sizeof(uint16_t), MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
     ESP_RETURN_ON_FALSE(buffer != NULL, ESP_ERR_NO_MEM, TAG, "rect buffer allocation failed");
+    const uint16_t bus_color = lcd_pack_rgb565(rgb565);
     for (int i = 0; i < pixels; ++i) {
-        buffer[i] = rgb565;
+        buffer[i] = bus_color;
     }
 
     for (int row = 0; row < h; row += chunk_rows_max) {
@@ -384,6 +408,30 @@ static esp_err_t onx_bsp_lcd_draw_label_centered(int cx, int cy, const char *tex
     const int w = text5x7_width(text, scale);
     const int h = 7 * scale;
     return onx_bsp_lcd_draw_text5x7(cx - w / 2, cy - h / 2, text, color, scale);
+}
+
+static esp_err_t onx_bsp_lcd_draw_direction_overlay(void)
+{
+    ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_label_centered(ONX_LCD_H_RES / 2, 18, "TOP", RGB565_WHITE, 2),
+                        TAG, "draw TOP failed");
+    ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_label_centered(ONX_LCD_H_RES / 2, ONX_LCD_V_RES - 18, "BOTTOM",
+                                                        RGB565_WHITE, 2),
+                        TAG, "draw BOTTOM failed");
+    ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_label_centered(34, ONX_LCD_V_RES / 2, "LEFT", RGB565_WHITE, 2),
+                        TAG, "draw LEFT failed");
+    ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_label_centered(ONX_LCD_H_RES - 42, ONX_LCD_V_RES / 2, "RIGHT",
+                                                        RGB565_WHITE, 2),
+                        TAG, "draw RIGHT failed");
+
+    ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_rect(108, ONX_LCD_V_RES - 42, 84, 4, RGB565_YELLOW), TAG, "draw X axis failed");
+    ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_rect(188, ONX_LCD_V_RES - 50, 4, 20, RGB565_YELLOW), TAG, "draw X arrow failed");
+    ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_label_centered(205, ONX_LCD_V_RES - 40, "X", RGB565_WHITE, 2),
+                        TAG, "draw X label failed");
+
+    ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_rect(24, 116, 4, 84, RGB565_YELLOW), TAG, "draw Y axis failed");
+    ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_rect(16, 196, 20, 4, RGB565_YELLOW), TAG, "draw Y arrow failed");
+    ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_label_centered(24, 214, "Y", RGB565_WHITE, 2), TAG, "draw Y label failed");
+    return ESP_OK;
 }
 
 static esp_err_t onx_bsp_lcd_draw_box_marker(int cx, int cy, const char *label)
@@ -440,6 +488,7 @@ static esp_err_t onx_bsp_lcd_draw_touch_acceptance_page(void)
 {
     ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_rect(0, 0, ONX_LCD_H_RES, ONX_LCD_V_RES, RGB565_DARK_GRAY),
                         TAG, "draw touch bg failed");
+    ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_direction_overlay(), TAG, "draw direction overlay failed");
 
     for (size_t i = 0; i < sizeof(s_touch_targets) / sizeof(s_touch_targets[0]); ++i) {
         ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_box_marker(s_touch_targets[i].x,
@@ -448,7 +497,7 @@ static esp_err_t onx_bsp_lcd_draw_touch_acceptance_page(void)
                             TAG, "draw touch target failed");
     }
 
-    ESP_LOGI(TAG, "LCD touch target page complete: TL TR BR BL CENTER");
+    ESP_LOGI(TAG, "LCD touch target page complete: TOP BOTTOM LEFT RIGHT X Y TL TR BR BL CENTER");
     return ESP_OK;
 }
 
@@ -478,7 +527,7 @@ esp_err_t onx_bsp_lcd_fill(uint16_t rgb565)
     ESP_RETURN_ON_FALSE(buffer != NULL, ESP_ERR_NO_MEM, TAG, "LCD line buffer allocation failed");
 
     for (int i = 0; i < pixels; ++i) {
-        buffer[i] = rgb565;
+        buffer[i] = lcd_pack_rgb565(rgb565);
     }
 
     for (int y = 0; y < ONX_LCD_V_RES; y += rows) {
@@ -510,8 +559,9 @@ esp_err_t onx_bsp_lcd_fill_bars(void)
         const int pixels = ONX_LCD_H_RES * rows;
         uint16_t *buffer = heap_caps_malloc(pixels * sizeof(uint16_t), MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
         ESP_RETURN_ON_FALSE(buffer != NULL, ESP_ERR_NO_MEM, TAG, "LCD bar buffer allocation failed");
+        const uint16_t bus_color = lcd_pack_rgb565(colors[band]);
         for (int i = 0; i < pixels; ++i) {
-            buffer[i] = colors[band];
+            buffer[i] = bus_color;
         }
         esp_err_t err = lcd_draw_window(0, y0, ONX_LCD_H_RES, y1, buffer, pixels * sizeof(uint16_t));
         free(buffer);
@@ -617,7 +667,7 @@ esp_err_t onx_bsp_smoke_run(void)
     vTaskDelay(pdMS_TO_TICKS(10000));
 
     ESP_RETURN_ON_ERROR(onx_bsp_touch_init(), TAG, "Touch init failed");
-    ESP_LOGI(TAG, "M2 touch acceptance page: tap TL, TR, BR, BL, CENTER targets");
+    ESP_LOGI(TAG, "M2 touch acceptance page: verify TOP/BOTTOM/LEFT/RIGHT and tap TL, TR, BR, BL, CENTER");
     ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_touch_acceptance_page(), TAG, "LCD touch target page failed");
 
     ESP_LOGI(TAG, "ONX3248G035 BSP smoke init complete; touch sampling is running");

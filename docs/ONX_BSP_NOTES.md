@@ -56,7 +56,18 @@ Firmware path:
 Flash command used:
 
 ```sh
-idf.py -C examples/onx_bsp_smoke -p /dev/cu.wchusbserial10 flash
+cd /Users/alex/Documents/codex_project/Nextion_project_PrintSphere
+export IDF_TOOLS_PATH="$PWD/.tools/espressif"
+export IDF_COMPONENT_MANAGER=0
+. "$PWD/.tools/esp-idf-v6.0.1/export.sh"
+idf.py -C examples/onx_bsp_smoke build
+cd examples/onx_bsp_smoke/build
+python -m esptool --chip esp32s3 \
+  -p /dev/tty.wchusbserial10 \
+  -b 115200 \
+  --before default-reset \
+  --after hard-reset \
+  write-flash @flash_args
 ```
 
 ## Verification Result
@@ -64,12 +75,14 @@ idf.py -C examples/onx_bsp_smoke -p /dev/cu.wchusbserial10 flash
 Build result on 2026-06-02:
 
 - `onx_bsp_smoke.bin` generated successfully.
-- Binary size: `0x3d400` bytes.
+- Main-thread review build after the final LCD configuration change generated
+  binary size `0x3e050` bytes.
 - Smallest app partition free space: 76%.
 
 Flash result on 2026-06-02:
 
-- Port: `/dev/cu.wchusbserial10`.
+- Port: `/dev/tty.wchusbserial10`.
+- Baud: `115200`.
 - Chip: ESP32-S3 QFN56 revision v0.2.
 - PSRAM: embedded 8 MB detected.
 - Bootloader, partition table, and `onx_bsp_smoke.bin` wrote and verified.
@@ -84,7 +97,7 @@ I (761) onx_bsp: Backlight PWM ready: gpio=6 freq=10000Hz
 I (765) onx_bsp: Backlight PWM set: 30% duty=306
 I (770) onx_bsp: PCF8574 pin 6=0 state=0xDF
 I (974) onx_bsp: PCF8574 pin 6=1 state=0xFF
-I (1415) onx_bsp: LCD init complete: ST7796 SPI 320x480 pclk=80000000
+I (1415) onx_bsp: LCD init complete: ST7796 SPI 320x480 pclk=80000000 madctl=0x48 colmod=0x55 invert=off rgb565=byte_swap
 I (1448) onx_bsp: LCD fill complete: color=0xF800
 I (1982) onx_bsp: LCD fill complete: color=0x07E0
 I (2515) onx_bsp: LCD fill complete: color=0x001F
@@ -92,11 +105,15 @@ I (3040) onx_bsp: LCD color bars complete
 I (3040) onx_bsp: Backlight PWM set: 100% duty=1023
 I (3041) onx_bsp: Touch init complete: CST826 addr=0x15 chip_id=0x11
 I (3043) onx_bsp: ONX3248G035 BSP smoke init complete; touch sampling is running
-I (3043) onx_bsp: Tap the four screen corners; coordinates print only when touch is detected
+I (3043) onx_bsp: Tap the labeled screen targets; coordinates print only when touch is detected
 I (13043) onx_bsp: Touch sampler still running; waiting for touch
 ```
 
-Open validation:
+Final validation:
 
-- Four-corner touch coordinate mapping still needs a manual tap test while the smoke firmware keeps sampling.
-- The serial log proves LCD transfers completed; visual color order and panel orientation should be confirmed by looking at the device.
+- Touch coordinate mapping passed in `docs/M2_BSP_ACCEPTANCE.md`: no
+  `swap_xy`, no `mirror_x`, no `mirror_y`.
+- User visual acceptance on 2026-06-02 confirmed labeled colors, white/black
+  inversion, readable non-mirrored text, and expected touch label positions.
+- Final LCD hardware configuration is explained in
+  `docs/ONX3248G035_HARDWARE_CONFIG.md`.

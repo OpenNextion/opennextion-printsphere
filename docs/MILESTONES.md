@@ -60,17 +60,23 @@ Current status:
 - Serial logs prove I2C, PCF8574, GPIO6 backlight PWM, ST7796 init, LCD color fills, and CST826 chip ID read.
 - Four-corner touch capture passed on 2026-06-02; no swap or mirror correction is needed.
 - Enhanced labeled smoke firmware built and flashed on 2026-06-02 for user-visible color and touch target acceptance.
-- Remaining manual acceptance steps are documented in `docs/M2_BSP_ACCEPTANCE.md`.
+- Final user visual acceptance passed on 2026-06-02: color labels, white/black
+  inversion, readable text orientation, and touch label positions are correct.
+- Final LCD hardware configuration is recorded in
+  `docs/ONX3248G035_HARDWARE_CONFIG.md`.
+- M2 is accepted for demo-first BSP bring-up. Remaining hardware features such
+  as SD, battery ADC, charge status, and LVGL integration move to later
+  PrintSphere integration milestones.
 
 Tasks:
 
 - Build and flash a minimal ONX test firmware. Done with `examples/onx_bsp_smoke`.
 - Initialize ST7796 LCD. Done in BSP smoke logs.
 - Fill screen with test colors. Done in BSP smoke logs.
-- Show labeled color blocks. Done in enhanced smoke firmware; waiting for user visual confirmation.
+- Show labeled color blocks. Done and visually accepted by the user.
 - Initialize CST826 touch. Done; chip ID `0x11` read from address `0x15`.
 - Verify four-corner touch coordinates. Done; coordinates map left-to-right and top-to-bottom.
-- Show labeled touch targets. Done in enhanced smoke firmware.
+- Show labeled touch targets. Done and visually accepted by the user.
 - Verify GPIO6 backlight PWM. Done in BSP smoke logs for 30% and 100% duty settings.
 
 Exit criteria:
@@ -78,7 +84,7 @@ Exit criteria:
 - Screen displays correct colors.
 - Touch coordinates map correctly.
 - Brightness changes visibly.
-- Serial logs are stable for 10 minutes.
+- Serial logs show stable smoke runtime evidence for demo-first acceptance.
 
 ## M3 - PrintSphere Starts on ONX BSP
 

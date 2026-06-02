@@ -153,7 +153,13 @@ idf.py --version
 cmake --version
 ninja --version
 ls /dev/cu.*
+ls /dev/tty.wchusbserial*
+lsof /dev/cu.wchusbserial10 /dev/tty.wchusbserial10
 ```
+
+Before flashing, `lsof` should return no owner for either ONX serial endpoint.
+If a prior monitor or log reader is still attached, close it using the serial
+session lifecycle in `docs/BUILD_FLASH.md` before running esptool.
 
 ## Blank Build/Flash Smoke Test
 
@@ -175,3 +181,32 @@ Verified results:
 - Monitor evidence: serial output showed `ESP-IDF v6.0.1 2nd stage bootloader`, `Project name: hello_world`, and `Hello world!`.
 
 This smoke test verifies the host toolchain, WCH serial driver, serial permissions via approved external execution, ESP32-S3 download/reset flow, and serial output path.
+
+## ONX BSP Smoke Build/Flash Acceptance
+
+The project-local ONX BSP smoke flow was verified on 2026-06-02.
+
+Verified results:
+
+- Project: `/Users/alex/Documents/codex_project/Nextion_project_PrintSphere/examples/onx_bsp_smoke`.
+- Branch: `feature/onx-bsp-bringup`.
+- Commit: `c42d17f Add labeled M2 smoke acceptance screens`.
+- Environment: `.tools/esp-idf-v6.0.1` with
+  `IDF_TOOLS_PATH=$PWD/.tools/espressif`.
+- Build command: `IDF_COMPONENT_MANAGER=0 idf.py -C examples/onx_bsp_smoke build`.
+- Firmware image: `examples/onx_bsp_smoke/build/onx_bsp_smoke.bin`.
+- Binary size during repeated flash acceptance: `0x3db80`.
+- Main-thread review build after the final LCD configuration change: `0x3e050`.
+- Flash endpoint: `/dev/tty.wchusbserial10`.
+- Flash baud: `115200`.
+- Flash method: direct `python -m esptool ... write-flash @flash_args`.
+- Repeated flash result: 2 consecutive standard flashes succeeded, each with
+  bootloader, partition table, and app hash verification.
+- Log capture: short PySerial read at `115200` returned ONX BSP smoke runtime
+  logs, including `onx_bsp: Touch sampler still running; waiting for touch`.
+
+Development threads may flash for assigned hardware or code validation, but
+they must use the standard flow in `docs/BUILD_FLASH.md`. If the standard flow
+fails, collect the required evidence and hand the failure to Env/Serial/Flash
+instead of changing ports, baud rate, reset flags, flash arguments, partition
+layout, or ESP-IDF version.

@@ -21,6 +21,23 @@ Firmware path after a successful build:
 examples/onx_bsp_smoke/build/onx_bsp_smoke.bin
 ```
 
+Flash with the standard ONX BSP smoke flow:
+
+```sh
+cd /Users/alex/Documents/codex_project/Nextion_project_PrintSphere
+export IDF_TOOLS_PATH="$PWD/.tools/espressif"
+export IDF_COMPONENT_MANAGER=0
+. "$PWD/.tools/esp-idf-v6.0.1/export.sh"
+idf.py -C examples/onx_bsp_smoke build
+cd examples/onx_bsp_smoke/build
+python -m esptool --chip esp32s3 \
+  -p /dev/tty.wchusbserial10 \
+  -b 115200 \
+  --before default-reset \
+  --after hard-reset \
+  write-flash @flash_args
+```
+
 Expected serial evidence:
 
 - `I2C ready`
@@ -30,8 +47,8 @@ Expected serial evidence:
 - `M2 color acceptance page: verify RED/GREEN/BLUE/WHITE/BLACK labels`
 - `LCD labeled color page complete: RED GREEN BLUE WHITE BLACK`
 - `Touch init complete`
-- `M2 touch acceptance page: tap TL, TR, BR, BL, CENTER targets`
-- `LCD touch target page complete: TL TR BR BL CENTER`
+- `M2 touch acceptance page: verify TOP/BOTTOM/LEFT/RIGHT and tap TL, TR, BR, BL, CENTER`
+- `LCD touch target page complete: TOP BOTTOM LEFT RIGHT X Y TL TR BR BL CENTER`
 - `Touch sampler still running; waiting for touch`
 - optional `Touch: points=... x=... y=... target=...`
 
@@ -41,6 +58,10 @@ Manual acceptance:
    `WHITE`, and `BLACK`.
 2. Confirm the labels are readable: black text on bright blocks and white text
    on dark blocks.
-3. After the firmware switches to the touch page, tap the marked targets:
+3. Confirm the color labels match the visible colors and white/black are not
+   inverted.
+4. After the firmware switches to the touch page, confirm the direction labels:
+   `TOP`, `BOTTOM`, `LEFT`, `RIGHT`, `X`, and `Y`.
+5. Tap the marked targets:
    `TL`, `TR`, `BR`, `BL`, and `CENTER`.
-4. Check serial output for matching `target=TL/TR/BR/BL/CENTER` touch lines.
+6. Check serial output for matching `target=TL/TR/BR/BL/CENTER` touch lines.

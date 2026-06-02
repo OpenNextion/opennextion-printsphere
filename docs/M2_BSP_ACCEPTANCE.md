@@ -21,6 +21,8 @@ Already accepted by build and serial evidence:
 - Continuous touch sampling loop.
 - Enhanced smoke screen flow with a labeled color page and labeled touch target
   page.
+- Direction marker page with `TOP`, `BOTTOM`, `LEFT`, `RIGHT`, `X`, and `Y`
+  labels.
 
 Remaining manual checks:
 
@@ -38,7 +40,13 @@ export IDF_TOOLS_PATH="$PWD/.tools/espressif"
 export IDF_COMPONENT_MANAGER=0
 . "$PWD/.tools/esp-idf-v6.0.1/export.sh"
 idf.py -C examples/onx_bsp_smoke build
-idf.py -C examples/onx_bsp_smoke -p /dev/cu.wchusbserial10 flash
+cd examples/onx_bsp_smoke/build
+python -m esptool --chip esp32s3 \
+  -p /dev/tty.wchusbserial10 \
+  -b 115200 \
+  --before default-reset \
+  --after hard-reset \
+  write-flash @flash_args
 ```
 
 ## Serial Capture
@@ -48,10 +56,8 @@ Use this command when the user is ready to tap the screen:
 ```sh
 cd /Users/alex/Documents/codex_project/Nextion_project_PrintSphere
 export IDF_TOOLS_PATH="$PWD/.tools/espressif"
-export IDF_COMPONENT_MANAGER=0
 . "$PWD/.tools/esp-idf-v6.0.1/export.sh"
-python -m esptool --chip esp32s3 -p /dev/cu.wchusbserial10 run
-python -c 'import serial,time; p="/dev/cu.wchusbserial10"; s=serial.Serial(p,115200,timeout=0.2); end=time.time()+60; buf=[]; print("Capture started: tap TL, TR, BR, BL, center");
+python -c 'import serial,time; p="/dev/tty.wchusbserial10"; s=serial.Serial(p,115200,timeout=0.2); end=time.time()+60; print("Capture started: verify direction labels, then tap TL, TR, BR, BL, CENTER");
 while time.time()<end:
     data=s.read(4096)
     if data:
@@ -66,8 +72,8 @@ Expected boot evidence before tapping:
 M2 color acceptance page: verify RED/GREEN/BLUE/WHITE/BLACK labels
 LCD labeled color page complete: RED GREEN BLUE WHITE BLACK
 Touch init complete: CST826 addr=0x15 chip_id=0x11
-M2 touch acceptance page: tap TL, TR, BR, BL, CENTER targets
-LCD touch target page complete: TL TR BR BL CENTER
+M2 touch acceptance page: verify TOP/BOTTOM/LEFT/RIGHT and tap TL, TR, BR, BL, CENTER
+LCD touch target page complete: TOP BOTTOM LEFT RIGHT X Y TL TR BR BL CENTER
 ONX3248G035 BSP smoke init complete; touch sampling is running
 Touch sampler still running; waiting for touch
 ```
@@ -93,13 +99,20 @@ Touch: points=1 x=... y=... target=...
 5. Record the orientation: portrait `320 x 480`, landscape `480 x 320`, rotated,
    mirrored, or otherwise wrong.
 6. Wait for the firmware to switch to the touch page.
-7. Tap the visible target markers in this order:
+7. Confirm the direction labels are physically correct:
+   - `TOP` is at the top edge.
+   - `BOTTOM` is at the bottom edge.
+   - `LEFT` is on the left edge.
+   - `RIGHT` is on the right edge.
+   - `X` points toward the right.
+   - `Y` points downward.
+8. Tap the visible target markers in this order:
    - `TL`
    - `TR`
    - `BR`
    - `BL`
    - `CENTER`
-8. Pause about one second between taps.
+9. Pause about one second between taps.
 
 ## Pass Criteria
 
@@ -109,6 +122,7 @@ Visual LCD check passes when:
 - The five labeled color blocks are visible.
 - `RED`, `GREEN`, `BLUE`, `WHITE`, and `BLACK` labels match the visible colors.
 - Labels are readable on their backgrounds.
+- Direction labels are not mirrored and are physically located correctly.
 - Orientation is known and can be used by the UI thread.
 
 Touch check passes when:
@@ -143,6 +157,7 @@ LCD visual:
 - Color order:
 - Label readability:
 - Orientation:
+- Direction labels:
 - Brightness visible:
 - Notes:
 
@@ -217,7 +232,8 @@ Mapping inference:
 Decision:
 
 - Touch coordinate check: pass.
-- Visual LCD color and orientation check: still needs user confirmation.
+- Visual LCD color and orientation check was still pending at this point; see
+  the final LCD visual check below.
 
 ## Acceptance Record - 2026-06-02 Enhanced Smoke Firmware
 
@@ -254,5 +270,32 @@ Touch sampler still running; waiting for touch
 Decision:
 
 - Enhanced labeled smoke firmware: pass by build, flash, and serial evidence.
-- Visual confirmation by the user is still required for label readability,
-  visible colors, and screen orientation.
+- Visual confirmation was still pending at this point; see the final LCD visual
+  check below.
+
+## Acceptance Record - 2026-06-02 Final LCD Visual Check
+
+Branch: `feature/onx-bsp-bringup`
+
+Firmware: `examples/onx_bsp_smoke`
+
+Main-thread review build:
+
+- `IDF_COMPONENT_MANAGER=0 idf.py -C examples/onx_bsp_smoke build` passed
+  after the final LCD configuration change.
+- Binary size: `0x3e050`.
+
+LCD visual:
+
+- Labeled color blocks visible: pass.
+- Color order: pass.
+- White/black inversion: pass, colors are no longer inverted.
+- Label readability: pass.
+- Text mirror/orientation: pass, text is no longer mirrored.
+- Touch page label position: pass, positions match expectation.
+
+Decision:
+
+- LCD visual check: pass.
+- Touch target visual check: pass.
+- M2 BSP smoke visual acceptance: pass.
