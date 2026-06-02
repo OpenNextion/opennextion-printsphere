@@ -1,0 +1,60 @@
+idf_component_register(
+    SRCS
+        "app_main.cpp"
+        "src/application.cpp"
+        "src/bambu_status.cpp"
+        "src/bambu_cloud_client.cpp"
+        "src/config_store.cpp"
+        "src/error_lookup.cpp"
+        "include/font/dosis_20.c"
+        "include/font/dosis_32.c"
+        "include/font/dosis_40.c"
+        "include/img/bambuicon.c"
+        "include/font/mdi_30.c"
+        "include/font/mdi_40.c"
+        "src/pmu.cpp"
+        "src/p1s_camera_client.cpp"
+        "src/printer_client.cpp"
+        "src/printer_state.cpp"
+        "src/debug_log_buffer.cpp"
+        "src/setup_portal.cpp"
+        "src/status_resolver.cpp"
+        "src/time_sync.cpp"
+        "src/ui.cpp"
+        "src/wifi_manager.cpp"
+    INCLUDE_DIRS
+        "include"
+    EMBED_TXTFILES
+        "include/certs/bambu.cert"
+        "include/certs/bambu_p2s_250626.cert"
+        "include/certs/bambu_h2c_251122.cert"
+        "include/error_lookup/error_lookup.tsv"
+    REQUIRES
+        XPowersLib
+        app_update
+        esp_https_ota
+        esp32_s3_touch_amoled_1_75
+        esp_driver_gpio
+        esp_event
+        esp_http_client
+        esp_http_server
+        mqtt
+        esp_netif
+        lwip
+        espressif__esp_new_jpeg
+        esp-tls
+        esp_wifi
+        libpng
+        lvgl
+        nvs_flash
+)
+
+target_compile_definitions(${COMPONENT_LIB} PRIVATE
+    PRINTSPHERE_RELEASE_VERSION="${PRINTSPHERE_RELEASE_VERSION}"
+)
+string(FIND "${PRINTSPHERE_RELEASE_VERSION}" "-debug" _debug_pos)
+string(FIND "${PRINTSPHERE_RELEASE_VERSION}" "_debug" _debug_pos2)
+if(_debug_pos GREATER -1 OR _debug_pos2 GREATER -1)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE PRINTSPHERE_DEBUG_BUILD=1)
+endif()
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wall -Wextra)
