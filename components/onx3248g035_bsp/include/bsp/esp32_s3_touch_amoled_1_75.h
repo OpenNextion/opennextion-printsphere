@@ -106,6 +106,8 @@ lv_display_t *bsp_display_start_with_config(bsp_display_cfg_t *cfg);
 lv_indev_t *bsp_display_get_input_dev(void);
 esp_err_t bsp_display_lock(uint32_t timeout_ms);
 void bsp_display_unlock(void);
+esp_err_t bsp_display_pause(int32_t timeout_ms);
+esp_err_t bsp_display_resume(void);
 #endif
 
 #ifdef __cplusplus

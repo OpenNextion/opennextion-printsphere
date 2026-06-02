@@ -38,7 +38,7 @@ if(IDF_VERSION_MAJOR EQUAL 6 AND IDF_VERSION_MINOR EQUAL 0 AND IDF_VERSION_PATCH
         idf_component_get_property(ESP_LVGL_ADAPTER_LIB espressif__esp_lvgl_adapter COMPONENT_LIB)
         if(ESP_LVGL_ADAPTER_LIB)
             target_compile_options(${ESP_LVGL_ADAPTER_LIB} PRIVATE
-                "-include" "${CMAKE_SOURCE_DIR}/main/include/printsphere/esp_timer_compat.h"
+                "SHELL:-include ${CMAKE_SOURCE_DIR}/main/include/printsphere/esp_timer_compat.h"
             )
         endif()
     endif()

@@ -30,6 +30,7 @@ static uint16_t *s_lvgl_buf;
 static onx_touch_point_t s_last_touch;
 static uint32_t s_lvgl_flush_count;
 static uint32_t s_lvgl_timer_count;
+static volatile bool s_lvgl_paused;
 
 static uint32_t onx_lvgl_tick_get(void)
 {
@@ -152,6 +153,11 @@ static void onx_lvgl_task(void *arg)
 
     while (true) {
         uint32_t delay_ms = 10;
+        if (s_lvgl_paused) {
+            vTaskDelay(pdMS_TO_TICKS(20));
+            continue;
+        }
+
         if (onx_lvgl_take(1000)) {
             delay_ms = lv_timer_handler();
             s_lvgl_timer_count++;
@@ -339,4 +345,30 @@ esp_err_t onx_bsp_lvgl_lock(uint32_t timeout_ms)
 void onx_bsp_lvgl_unlock(void)
 {
     onx_lvgl_give();
+}
+
+esp_err_t onx_bsp_lvgl_pause(int32_t timeout_ms)
+{
+    if (s_lvgl_task == NULL || s_lvgl_display == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    s_lvgl_paused = true;
+    const uint32_t lock_timeout = (timeout_ms < 0) ? UINT32_MAX : (uint32_t)timeout_ms;
+    if (!onx_lvgl_take(lock_timeout)) {
+        s_lvgl_paused = false;
+        return ESP_ERR_TIMEOUT;
+    }
+    onx_lvgl_give();
+    return ESP_OK;
+}
+
+esp_err_t onx_bsp_lvgl_resume(void)
+{
+    if (s_lvgl_task == NULL || s_lvgl_display == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    s_lvgl_paused = false;
+    return ESP_OK;
 }

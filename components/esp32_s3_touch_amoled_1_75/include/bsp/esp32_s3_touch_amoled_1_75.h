@@ -316,6 +316,20 @@ esp_err_t bsp_display_lock(uint32_t timeout_ms);
  *
  */
 void bsp_display_unlock(void);
+
+/**
+ * @brief Pause LVGL rendering worker
+ *
+ * Board-compatible wrapper for display power-save transitions.
+ */
+esp_err_t bsp_display_pause(int32_t timeout_ms);
+
+/**
+ * @brief Resume LVGL rendering worker
+ *
+ * Board-compatible wrapper for display power-save transitions.
+ */
+esp_err_t bsp_display_resume(void);
 #endif // BSP_CONFIG_NO_GRAPHIC_LIB == 0
 
 #ifdef __cplusplus

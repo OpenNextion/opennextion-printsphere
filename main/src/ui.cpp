@@ -3493,7 +3493,7 @@ void Ui::wake_display() {
   screen_power_mode_ = ScreenPowerMode::kAwake;
   apply_brightness_policy();
   if (was_off) {
-    esp_lv_adapter_resume();
+    bsp_display_resume();
   }
 }
 
@@ -3569,7 +3569,7 @@ void Ui::update_power_save(bool on_battery, bool print_active) {
     // signal — that would permanently deadlock the worker.  Instead, abort
     // the screen-off transition and stay in the current power mode.
     if (going_off && !was_off) {
-      esp_err_t pause_ret = esp_lv_adapter_pause(1000);
+      esp_err_t pause_ret = bsp_display_pause(1000);
       if (pause_ret != ESP_OK) {
         ESP_LOGW(kTag, "LVGL worker pause timeout — aborting screen-off to avoid TE deadlock (%s)",
                  esp_err_to_name(pause_ret));
@@ -3584,7 +3584,7 @@ void Ui::update_power_save(bool on_battery, bool print_active) {
     apply_brightness_policy();
 
     if (was_off && !going_off) {
-      esp_lv_adapter_resume();
+      bsp_display_resume();
     }
   }
 }

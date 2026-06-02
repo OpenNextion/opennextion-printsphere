@@ -137,6 +137,10 @@ Target behavior:
   - Standard `CASET`/`RASET` portrait windows with no direction-hiding offsets.
 - `bsp_display_lock()` and `bsp_display_unlock()` should forward to the LVGL
   adapter lock once the ONX LVGL display path owns the adapter.
+- `bsp_display_pause()` and `bsp_display_resume()` should expose the
+  board-compatible display lifecycle used by UI power-save code. The UI should
+  not call raw adapter symbols directly because ONX owns a local LVGL task while
+  Waveshare owns the Espressif adapter worker.
 - `bsp_display_rotation_set()` must either:
   - start with portrait-only `BSP_DISPLAY_ROTATE_0`, or
   - implement the same rotation enum with a tested ST7796/LVGL coordinate
@@ -174,6 +178,12 @@ Status:
   archive ordering.
 - `bsp_display_lock()` and `bsp_display_unlock()` use the ONX LVGL adapter's
   recursive mutex when LVGL is enabled.
+- `bsp_display_pause()` and `bsp_display_resume()` are implemented for the ONX
+  LVGL path. Pause marks the local LVGL task paused and takes/releases the
+  recursive mutex to wait for any active `lv_timer_handler()` cycle to finish;
+  resume clears that paused state. The Waveshare BSP exposes the same wrapper
+  names and forwards them to `esp_lv_adapter_pause()` /
+  `esp_lv_adapter_resume()`.
 - `bsp_display_rotation_set()` accepts only `BSP_DISPLAY_ROTATE_0` for the
   accepted portrait orientation. Other rotations return `ESP_ERR_NOT_SUPPORTED`
   until ST7796U and touch transforms are retested.

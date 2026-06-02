@@ -1005,3 +1005,13 @@ void bsp_display_unlock(void)
 {
     esp_lv_adapter_unlock();
 }
+
+esp_err_t bsp_display_pause(int32_t timeout_ms)
+{
+    return esp_lv_adapter_pause(timeout_ms);
+}
+
+esp_err_t bsp_display_resume(void)
+{
+    return esp_lv_adapter_resume();
+}

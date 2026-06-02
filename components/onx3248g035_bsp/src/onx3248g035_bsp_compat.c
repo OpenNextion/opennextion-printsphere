@@ -38,6 +38,8 @@ lv_display_t *onx_bsp_lvgl_start(bsp_display_cfg_t *cfg);
 lv_indev_t *onx_bsp_lvgl_get_input_dev(void);
 esp_err_t onx_bsp_lvgl_lock(uint32_t timeout_ms);
 void onx_bsp_lvgl_unlock(void);
+esp_err_t onx_bsp_lvgl_pause(int32_t timeout_ms);
+esp_err_t onx_bsp_lvgl_resume(void);
 #endif
 
 typedef struct {
@@ -409,6 +411,27 @@ void bsp_display_unlock(void)
 {
 #if ONX_BSP_HAS_LVGL
     onx_bsp_lvgl_unlock();
+#endif
+}
+
+esp_err_t bsp_display_pause(int32_t timeout_ms)
+{
+#if ONX_BSP_HAS_LVGL
+    return onx_bsp_lvgl_pause(timeout_ms);
+#else
+    (void)timeout_ms;
+    ESP_LOGW(TAG, "LVGL pause unavailable before ONX adapter path is implemented");
+    return ESP_ERR_INVALID_STATE;
+#endif
+}
+
+esp_err_t bsp_display_resume(void)
+{
+#if ONX_BSP_HAS_LVGL
+    return onx_bsp_lvgl_resume();
+#else
+    ESP_LOGW(TAG, "LVGL resume unavailable before ONX adapter path is implemented");
+    return ESP_ERR_INVALID_STATE;
 #endif
 }
 

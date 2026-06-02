@@ -354,6 +354,17 @@ Current verification status:
   `esp_lv_adapter_pause` and `esp_lv_adapter_resume` are not declared in
   `main/src/ui.cpp`. This is now an app/UI-to-ONX-BSP LVGL lifecycle/API
   boundary issue, not the managed adapter timer compatibility issue.
+- The pause/resume lifecycle blocker is resolved by moving UI power-save calls
+  to BSP compatibility wrappers: `bsp_display_pause()` and
+  `bsp_display_resume()`. The Waveshare BSP forwards those wrappers to
+  `esp_lv_adapter_pause()` / `esp_lv_adapter_resume()`. The ONX BSP implements
+  the same wrapper names against its own LVGL task/mutex path, so ONX does not
+  need to expose raw adapter symbols or link the Waveshare BSP back into the
+  ONX profile.
+- A re-run of the standard Component Manager enabled ONX build passed:
+  `idf.py -DPRINTSPHERE_BOARD=onx3248g035 build`. It generated
+  `build/printsphere_idf.bin`, size `0x2c7aa0`; the smallest app partition is
+  `0x500000`, leaving `0x238560` bytes free.
 
 Diagnostic note:
 
@@ -371,10 +382,8 @@ Diagnostic note:
   application dependency `mqtt`.
 - Do not treat the offline diagnostic build as standard full-app acceptance.
   The standard full build remains the Component Manager enabled command above.
-  Current status: the managed adapter timer compatibility issue is resolved;
-  the active blocker is exposing or abstracting the adapter pause/resume
-  lifecycle API for ONX without pulling the Waveshare BSP path back into the
-  ONX profile.
+  Current status: the managed adapter timer compatibility issue and the
+  pause/resume lifecycle API boundary are resolved for build purposes.
 
 ## Required Changes for M3
 
@@ -382,10 +391,6 @@ Must change:
 
 - Implement the real ONX ST7796U panel-handle and LVGL adapter path.
 - Implement the ONX CST826 `esp_lcd_touch_handle_t` and LVGL input-device path.
-- Align the app/UI display lifecycle calls with the ONX-compatible LVGL adapter
-  API, including `esp_lv_adapter_pause` and `esp_lv_adapter_resume`.
-- Re-run the standard full PrintSphere ONX profile build after the pause/resume
-  lifecycle API boundary is resolved.
 
 Can defer:
 
