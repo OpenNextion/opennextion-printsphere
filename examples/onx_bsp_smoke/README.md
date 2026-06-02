@@ -27,8 +27,20 @@ Expected serial evidence:
 - `PCF8574 ready`
 - `Backlight PWM ready`
 - `LCD init complete`
-- `LCD fill complete`
-- `LCD color bars complete`
+- `M2 color acceptance page: verify RED/GREEN/BLUE/WHITE/BLACK labels`
+- `LCD labeled color page complete: RED GREEN BLUE WHITE BLACK`
 - `Touch init complete`
+- `M2 touch acceptance page: tap TL, TR, BR, BL, CENTER targets`
+- `LCD touch target page complete: TL TR BR BL CENTER`
 - `Touch sampler still running; waiting for touch`
-- optional `Touch: points=... x=... y=...`
+- optional `Touch: points=... x=... y=... target=...`
+
+Manual acceptance:
+
+1. Confirm the color page shows five labeled blocks: `RED`, `GREEN`, `BLUE`,
+   `WHITE`, and `BLACK`.
+2. Confirm the labels are readable: black text on bright blocks and white text
+   on dark blocks.
+3. After the firmware switches to the touch page, tap the marked targets:
+   `TL`, `TR`, `BR`, `BL`, and `CENTER`.
+4. Check serial output for matching `target=TL/TR/BR/BL/CENTER` touch lines.

@@ -59,6 +59,7 @@ Current status:
 - Build and flash passed on 2026-06-02.
 - Serial logs prove I2C, PCF8574, GPIO6 backlight PWM, ST7796 init, LCD color fills, and CST826 chip ID read.
 - Four-corner touch capture passed on 2026-06-02; no swap or mirror correction is needed.
+- Enhanced labeled smoke firmware built and flashed on 2026-06-02 for user-visible color and touch target acceptance.
 - Remaining manual acceptance steps are documented in `docs/M2_BSP_ACCEPTANCE.md`.
 
 Tasks:
@@ -66,8 +67,10 @@ Tasks:
 - Build and flash a minimal ONX test firmware. Done with `examples/onx_bsp_smoke`.
 - Initialize ST7796 LCD. Done in BSP smoke logs.
 - Fill screen with test colors. Done in BSP smoke logs.
+- Show labeled color blocks. Done in enhanced smoke firmware; waiting for user visual confirmation.
 - Initialize CST826 touch. Done; chip ID `0x11` read from address `0x15`.
 - Verify four-corner touch coordinates. Done; coordinates map left-to-right and top-to-bottom.
+- Show labeled touch targets. Done in enhanced smoke firmware.
 - Verify GPIO6 backlight PWM. Done in BSP smoke logs for 30% and 100% duty settings.
 
 Exit criteria:

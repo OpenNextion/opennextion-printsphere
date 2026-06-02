@@ -19,11 +19,13 @@ Already accepted by build and serial evidence:
 - ST7796 SPI init and color-fill transfers.
 - CST826 init at `0x15`, chip ID `0x11`.
 - Continuous touch sampling loop.
+- Enhanced smoke screen flow with a labeled color page and labeled touch target
+  page.
 
 Remaining manual checks:
 
-- Visual LCD color and orientation check.
-- Four-corner touch coordinate check. Completed on 2026-06-02.
+- Visual LCD color, label readability, and orientation check.
+- Labeled target touch check.
 
 ## Setup
 
@@ -61,8 +63,11 @@ s.close()'
 Expected boot evidence before tapping:
 
 ```text
-LCD color bars complete
+M2 color acceptance page: verify RED/GREEN/BLUE/WHITE/BLACK labels
+LCD labeled color page complete: RED GREEN BLUE WHITE BLACK
 Touch init complete: CST826 addr=0x15 chip_id=0x11
+M2 touch acceptance page: tap TL, TR, BR, BL, CENTER targets
+LCD touch target page complete: TL TR BR BL CENTER
 ONX3248G035 BSP smoke init complete; touch sampling is running
 Touch sampler still running; waiting for touch
 ```
@@ -70,36 +75,46 @@ Touch sampler still running; waiting for touch
 Expected touch evidence while tapping:
 
 ```text
-Touch: points=1 x=... y=...
+Touch: points=1 x=... y=... target=...
 ```
 
 ## User Procedure
 
 1. Confirm the board screen is on.
-2. Confirm whether color bars are visible.
-3. Record whether the bars look red, green, blue, white, and black.
-4. Record the orientation: portrait `320 x 480`, landscape `480 x 320`, rotated,
+2. On the color page, confirm five labeled blocks are visible:
+   - `RED`
+   - `GREEN`
+   - `BLUE`
+   - `WHITE`
+   - `BLACK`
+3. Record whether each label matches the visible block color.
+4. Confirm labels are readable: black text on bright blocks, white text on dark
+   blocks.
+5. Record the orientation: portrait `320 x 480`, landscape `480 x 320`, rotated,
    mirrored, or otherwise wrong.
-5. When serial capture starts, tap in this order:
-   - Top-left corner.
-   - Top-right corner.
-   - Bottom-right corner.
-   - Bottom-left corner.
-   - Center.
-6. Pause about one second between taps.
+6. Wait for the firmware to switch to the touch page.
+7. Tap the visible target markers in this order:
+   - `TL`
+   - `TR`
+   - `BR`
+   - `BL`
+   - `CENTER`
+8. Pause about one second between taps.
 
 ## Pass Criteria
 
 Visual LCD check passes when:
 
 - The screen is not black, white-only, or corrupted.
-- Color bars are visible.
-- Red, green, blue, white, and black are distinguishable.
+- The five labeled color blocks are visible.
+- `RED`, `GREEN`, `BLUE`, `WHITE`, and `BLACK` labels match the visible colors.
+- Labels are readable on their backgrounds.
 - Orientation is known and can be used by the UI thread.
 
 Touch check passes when:
 
-- Each of the five taps produces at least one `Touch:` line.
+- Each of the five labeled target taps produces at least one `Touch:` line.
+- Serial `target=...` inference matches or is close to the tapped screen label.
 - Coordinates change in the expected direction across corners.
 - The coordinate range is plausible for the panel, roughly `0..319` on one axis
   and `0..479` on the other, allowing small edge offsets.
@@ -111,6 +126,7 @@ M2 should remain open if:
 - Color order is unclear.
 - Orientation cannot be determined.
 - Touch produces no coordinates.
+- The touch target page is missing or unreadable.
 - Coordinates are unstable enough that corner mapping cannot be inferred.
 
 ## Record Template
@@ -123,18 +139,19 @@ Firmware:
 Serial port:
 
 LCD visual:
-- Color bars visible:
+- Labeled color blocks visible:
 - Color order:
+- Label readability:
 - Orientation:
 - Brightness visible:
 - Notes:
 
 Touch taps:
-- Top-left:     x=, y=
-- Top-right:    x=, y=
-- Bottom-right: x=, y=
-- Bottom-left:  x=, y=
-- Center:       x=, y=
+- TL:     x=, y=, target=
+- TR:     x=, y=, target=
+- BR:     x=, y=, target=
+- BL:     x=, y=, target=
+- CENTER: x=, y=, target=
 
 Mapping inference:
 - swap_xy:
@@ -201,3 +218,41 @@ Decision:
 
 - Touch coordinate check: pass.
 - Visual LCD color and orientation check: still needs user confirmation.
+
+## Acceptance Record - 2026-06-02 Enhanced Smoke Firmware
+
+Branch: `feature/onx-bsp-bringup`
+
+Firmware: `examples/onx_bsp_smoke`
+
+Serial port: `/dev/cu.wchusbserial10`
+
+Build result:
+
+- `idf.py -C examples/onx_bsp_smoke build` passed.
+- Binary size: `0x3db80`.
+
+Flash result:
+
+- High-speed `idf.py flash` hit an intermittent pySerial readiness error while
+  connecting to the CH340 serial port.
+- Low-speed direct esptool flash through `/dev/tty.wchusbserial10` passed with
+  `-b 115200` and verified all written data.
+
+Serial evidence:
+
+```text
+M2 color acceptance page: verify RED/GREEN/BLUE/WHITE/BLACK labels
+LCD labeled color page complete: RED GREEN BLUE WHITE BLACK
+Touch init complete: CST826 addr=0x15 chip_id=0x11
+M2 touch acceptance page: tap TL, TR, BR, BL, CENTER targets
+LCD touch target page complete: TL TR BR BL CENTER
+ONX3248G035 BSP smoke init complete; touch sampling is running
+Touch sampler still running; waiting for touch
+```
+
+Decision:
+
+- Enhanced labeled smoke firmware: pass by build, flash, and serial evidence.
+- Visual confirmation by the user is still required for label readability,
+  visible colors, and screen orientation.

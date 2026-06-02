@@ -30,6 +30,13 @@ static const char *TAG = "onx_bsp";
 
 #define CST826_REG_DATA_START 0x02
 #define CST826_REG_CHIP_ID 0xAA
+#define RGB565_BLACK 0x0000
+#define RGB565_WHITE 0xFFFF
+#define RGB565_RED 0xF800
+#define RGB565_GREEN 0x07E0
+#define RGB565_BLUE 0x001F
+#define RGB565_DARK_GRAY 0x2104
+#define RGB565_YELLOW 0xFFE0
 
 typedef struct {
     uint8_t cmd;
@@ -37,6 +44,17 @@ typedef struct {
     uint8_t data_len;
     uint16_t delay_ms;
 } onx_lcd_init_cmd_t;
+
+typedef struct {
+    char letter;
+    uint8_t rows[7];
+} font5x7_glyph_t;
+
+typedef struct {
+    const char *name;
+    uint16_t x;
+    uint16_t y;
+} touch_target_t;
 
 static i2c_master_bus_handle_t s_i2c_bus;
 static i2c_master_dev_handle_t s_pcf8574_dev;
@@ -48,6 +66,32 @@ static bool s_spi_bus_ready;
 static bool s_lcd_ready;
 static bool s_backlight_ready;
 static bool s_touch_ready;
+
+static const font5x7_glyph_t s_font5x7[] = {
+    {'A', {0x0E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11}},
+    {'B', {0x1E, 0x11, 0x11, 0x1E, 0x11, 0x11, 0x1E}},
+    {'C', {0x0E, 0x11, 0x10, 0x10, 0x10, 0x11, 0x0E}},
+    {'D', {0x1E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1E}},
+    {'E', {0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x1F}},
+    {'G', {0x0E, 0x11, 0x10, 0x17, 0x11, 0x11, 0x0E}},
+    {'H', {0x11, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11}},
+    {'I', {0x0E, 0x04, 0x04, 0x04, 0x04, 0x04, 0x0E}},
+    {'K', {0x11, 0x12, 0x14, 0x18, 0x14, 0x12, 0x11}},
+    {'L', {0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1F}},
+    {'N', {0x11, 0x19, 0x15, 0x13, 0x11, 0x11, 0x11}},
+    {'R', {0x1E, 0x11, 0x11, 0x1E, 0x14, 0x12, 0x11}},
+    {'T', {0x1F, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04}},
+    {'U', {0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E}},
+    {'W', {0x11, 0x11, 0x11, 0x15, 0x15, 0x15, 0x0A}},
+};
+
+static const touch_target_t s_touch_targets[] = {
+    {"TL", 42, 48},
+    {"TR", 278, 48},
+    {"BR", 278, 405},
+    {"BL", 42, 405},
+    {"CENTER", 160, 240},
+};
 
 static const uint8_t s_cmd_colmod[] = {0x55};
 static const uint8_t s_cmd_f0_c3[] = {0xC3};
@@ -239,6 +283,191 @@ static esp_err_t lcd_draw_window(int x_start, int y_start, int x_end, int y_end,
     return ESP_OK;
 }
 
+static const uint8_t *font5x7_find(char letter)
+{
+    if (letter >= 'a' && letter <= 'z') {
+        letter = (char)(letter - 'a' + 'A');
+    }
+    for (size_t i = 0; i < sizeof(s_font5x7) / sizeof(s_font5x7[0]); ++i) {
+        if (s_font5x7[i].letter == letter) {
+            return s_font5x7[i].rows;
+        }
+    }
+    return NULL;
+}
+
+static int text5x7_width(const char *text, int scale)
+{
+    int chars = 0;
+    for (const char *p = text; *p != '\0'; ++p) {
+        ++chars;
+    }
+    if (chars == 0) {
+        return 0;
+    }
+    return (chars * 6 - 1) * scale;
+}
+
+static esp_err_t onx_bsp_lcd_draw_rect(int x, int y, int w, int h, uint16_t rgb565)
+{
+    ESP_RETURN_ON_ERROR(onx_bsp_lcd_init(), TAG, "LCD init failed");
+    if (x < 0) {
+        w += x;
+        x = 0;
+    }
+    if (y < 0) {
+        h += y;
+        y = 0;
+    }
+    if (x + w > ONX_LCD_H_RES) {
+        w = ONX_LCD_H_RES - x;
+    }
+    if (y + h > ONX_LCD_V_RES) {
+        h = ONX_LCD_V_RES - y;
+    }
+    ESP_RETURN_ON_FALSE(w > 0 && h > 0, ESP_OK, TAG, "empty rect");
+
+    const int chunk_rows_max = 16;
+    const int pixels = w * ((h < chunk_rows_max) ? h : chunk_rows_max);
+    uint16_t *buffer = heap_caps_malloc(pixels * sizeof(uint16_t), MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+    ESP_RETURN_ON_FALSE(buffer != NULL, ESP_ERR_NO_MEM, TAG, "rect buffer allocation failed");
+    for (int i = 0; i < pixels; ++i) {
+        buffer[i] = rgb565;
+    }
+
+    for (int row = 0; row < h; row += chunk_rows_max) {
+        const int chunk_rows = (row + chunk_rows_max <= h) ? chunk_rows_max : (h - row);
+        esp_err_t err = lcd_draw_window(x, y + row, x + w, y + row + chunk_rows, buffer,
+                                        w * chunk_rows * sizeof(uint16_t));
+        if (err != ESP_OK) {
+            free(buffer);
+            ESP_LOGE(TAG, "draw rect failed: %s", esp_err_to_name(err));
+            return err;
+        }
+    }
+
+    free(buffer);
+    return ESP_OK;
+}
+
+static esp_err_t onx_bsp_lcd_draw_char5x7(int x, int y, char letter, uint16_t color, int scale)
+{
+    if (letter == ' ') {
+        return ESP_OK;
+    }
+
+    const uint8_t *rows = font5x7_find(letter);
+    ESP_RETURN_ON_FALSE(rows != NULL, ESP_OK, TAG, "unsupported glyph");
+    for (int row = 0; row < 7; ++row) {
+        for (int col = 0; col < 5; ++col) {
+            if (rows[row] & (uint8_t)(1U << (4 - col))) {
+                ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_rect(x + col * scale, y + row * scale,
+                                                          scale, scale, color),
+                                    TAG, "draw glyph pixel failed");
+            }
+        }
+    }
+    return ESP_OK;
+}
+
+static esp_err_t onx_bsp_lcd_draw_text5x7(int x, int y, const char *text, uint16_t color, int scale)
+{
+    for (const char *p = text; *p != '\0'; ++p) {
+        ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_char5x7(x, y, *p, color, scale), TAG, "draw char failed");
+        x += 6 * scale;
+    }
+    return ESP_OK;
+}
+
+static esp_err_t onx_bsp_lcd_draw_label_centered(int cx, int cy, const char *text, uint16_t color, int scale)
+{
+    const int w = text5x7_width(text, scale);
+    const int h = 7 * scale;
+    return onx_bsp_lcd_draw_text5x7(cx - w / 2, cy - h / 2, text, color, scale);
+}
+
+static esp_err_t onx_bsp_lcd_draw_box_marker(int cx, int cy, const char *label)
+{
+    const int size = 38;
+    const int half = size / 2;
+    const int label_scale = 3;
+    const int label_h = 7 * label_scale;
+    int label_y = cy + half + 18;
+    if (label_y + label_h / 2 >= ONX_LCD_V_RES) {
+        label_y = cy - half - 18;
+    }
+    ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_rect(cx - half, cy - half, size, 4, RGB565_YELLOW), TAG, "target top failed");
+    ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_rect(cx - half, cy + half - 4, size, 4, RGB565_YELLOW), TAG, "target bottom failed");
+    ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_rect(cx - half, cy - half, 4, size, RGB565_YELLOW), TAG, "target left failed");
+    ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_rect(cx + half - 4, cy - half, 4, size, RGB565_YELLOW), TAG, "target right failed");
+    ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_rect(cx - 16, cy - 2, 32, 4, RGB565_WHITE), TAG, "target cross x failed");
+    ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_rect(cx - 2, cy - 16, 4, 32, RGB565_WHITE), TAG, "target cross y failed");
+    return onx_bsp_lcd_draw_label_centered(cx, label_y, label, RGB565_WHITE, label_scale);
+}
+
+static esp_err_t onx_bsp_lcd_draw_color_acceptance_page(void)
+{
+    typedef struct {
+        const char *label;
+        uint16_t bg;
+        uint16_t fg;
+    } color_block_t;
+
+    static const color_block_t blocks[] = {
+        {"RED", RGB565_RED, RGB565_BLACK},
+        {"GREEN", RGB565_GREEN, RGB565_BLACK},
+        {"BLUE", RGB565_BLUE, RGB565_WHITE},
+        {"WHITE", RGB565_WHITE, RGB565_BLACK},
+        {"BLACK", RGB565_BLACK, RGB565_WHITE},
+    };
+
+    const int block_h = ONX_LCD_V_RES / (int)(sizeof(blocks) / sizeof(blocks[0]));
+    for (size_t i = 0; i < sizeof(blocks) / sizeof(blocks[0]); ++i) {
+        const int y = (int)i * block_h;
+        const int h = (i == (sizeof(blocks) / sizeof(blocks[0]) - 1)) ? (ONX_LCD_V_RES - y) : block_h;
+        ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_rect(0, y, ONX_LCD_H_RES, h, blocks[i].bg),
+                            TAG, "draw color block failed");
+        ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_label_centered(ONX_LCD_H_RES / 2, y + h / 2,
+                                                            blocks[i].label, blocks[i].fg, 5),
+                            TAG, "draw color label failed");
+    }
+
+    ESP_LOGI(TAG, "LCD labeled color page complete: RED GREEN BLUE WHITE BLACK");
+    return ESP_OK;
+}
+
+static esp_err_t onx_bsp_lcd_draw_touch_acceptance_page(void)
+{
+    ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_rect(0, 0, ONX_LCD_H_RES, ONX_LCD_V_RES, RGB565_DARK_GRAY),
+                        TAG, "draw touch bg failed");
+
+    for (size_t i = 0; i < sizeof(s_touch_targets) / sizeof(s_touch_targets[0]); ++i) {
+        ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_box_marker(s_touch_targets[i].x,
+                                                        s_touch_targets[i].y,
+                                                        s_touch_targets[i].name),
+                            TAG, "draw touch target failed");
+    }
+
+    ESP_LOGI(TAG, "LCD touch target page complete: TL TR BR BL CENTER");
+    return ESP_OK;
+}
+
+static const char *infer_touch_target(uint16_t x, uint16_t y)
+{
+    const touch_target_t *best = &s_touch_targets[0];
+    uint32_t best_dist = UINT32_MAX;
+    for (size_t i = 0; i < sizeof(s_touch_targets) / sizeof(s_touch_targets[0]); ++i) {
+        const int32_t dx = (int32_t)x - (int32_t)s_touch_targets[i].x;
+        const int32_t dy = (int32_t)y - (int32_t)s_touch_targets[i].y;
+        const uint32_t dist = (uint32_t)(dx * dx + dy * dy);
+        if (dist < best_dist) {
+            best_dist = dist;
+            best = &s_touch_targets[i];
+        }
+    }
+    return best->name;
+}
+
 esp_err_t onx_bsp_lcd_fill(uint16_t rgb565)
 {
     ESP_RETURN_ON_ERROR(onx_bsp_lcd_init(), TAG, "LCD init failed");
@@ -382,25 +611,24 @@ esp_err_t onx_bsp_smoke_run(void)
     ESP_RETURN_ON_ERROR(onx_bsp_backlight_set(30), TAG, "Backlight 30 failed");
     ESP_RETURN_ON_ERROR(onx_bsp_lcd_init(), TAG, "LCD init failed");
 
-    ESP_RETURN_ON_ERROR(onx_bsp_lcd_fill(0xF800), TAG, "LCD red fill failed");
-    vTaskDelay(pdMS_TO_TICKS(500));
-    ESP_RETURN_ON_ERROR(onx_bsp_lcd_fill(0x07E0), TAG, "LCD green fill failed");
-    vTaskDelay(pdMS_TO_TICKS(500));
-    ESP_RETURN_ON_ERROR(onx_bsp_lcd_fill(0x001F), TAG, "LCD blue fill failed");
-    vTaskDelay(pdMS_TO_TICKS(500));
-    ESP_RETURN_ON_ERROR(onx_bsp_lcd_fill_bars(), TAG, "LCD bars failed");
-
     ESP_RETURN_ON_ERROR(onx_bsp_backlight_set(100), TAG, "Backlight 100 failed");
+    ESP_LOGI(TAG, "M2 color acceptance page: verify RED/GREEN/BLUE/WHITE/BLACK labels");
+    ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_color_acceptance_page(), TAG, "LCD labeled color page failed");
+    vTaskDelay(pdMS_TO_TICKS(10000));
+
     ESP_RETURN_ON_ERROR(onx_bsp_touch_init(), TAG, "Touch init failed");
+    ESP_LOGI(TAG, "M2 touch acceptance page: tap TL, TR, BR, BL, CENTER targets");
+    ESP_RETURN_ON_ERROR(onx_bsp_lcd_draw_touch_acceptance_page(), TAG, "LCD touch target page failed");
 
     ESP_LOGI(TAG, "ONX3248G035 BSP smoke init complete; touch sampling is running");
-    ESP_LOGI(TAG, "Tap the four screen corners; coordinates print only when touch is detected");
+    ESP_LOGI(TAG, "Tap the labeled screen targets; coordinates print only when touch is detected");
     uint32_t samples = 0;
     while (true) {
         onx_touch_point_t point = {};
         const esp_err_t err = onx_bsp_touch_read(&point);
         if (err == ESP_OK && point.points > 0) {
-            ESP_LOGI(TAG, "Touch: points=%u x=%u y=%u", point.points, point.x, point.y);
+            ESP_LOGI(TAG, "Touch: points=%u x=%u y=%u target=%s",
+                     point.points, point.x, point.y, infer_touch_target(point.x, point.y));
         } else if (err != ESP_OK) {
             ESP_LOGW(TAG, "Touch read failed: %s", esp_err_to_name(err));
         }
