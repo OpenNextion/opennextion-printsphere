@@ -221,6 +221,11 @@ class Ui {
   lv_obj_t* page2_image_ = nullptr;
   lv_obj_t* page2_note_ = nullptr;
   lv_obj_t* page2_subnote_ = nullptr;
+  lv_obj_t* page2_detail_label_ = nullptr;
+  lv_obj_t* page3_shell_ = nullptr;
+  lv_obj_t* page3_info_panel_ = nullptr;
+  lv_obj_t* page3_info_hint_ = nullptr;
+  lv_obj_t* page3_source_label_ = nullptr;
   lv_obj_t* page3_image_ = nullptr;
   lv_obj_t* page3_note_ = nullptr;
   lv_obj_t* page3_subnote_ = nullptr;

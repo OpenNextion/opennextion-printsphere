@@ -503,15 +503,16 @@ void add_onx_page_chrome(lv_obj_t* page,
     return;
   }
 
+  const bool cover_page = std::strcmp(title, "Cover") == 0;
   lv_obj_t* hint_line = lv_obj_create(page);
-  lv_obj_set_pos(hint_line, kOnxPagePad, kOnxBottomHintY);
-  lv_obj_set_size(hint_line, kOnxContentWidth, kOnxBottomHintHeight);
+  lv_obj_set_pos(hint_line, kOnxPagePad, cover_page ? 448 : kOnxBottomHintY);
+  lv_obj_set_size(hint_line, kOnxContentWidth, cover_page ? 20 : kOnxBottomHintHeight);
   make_transparent(hint_line);
   lv_obj_set_style_border_color(hint_line, lv_color_hex(kOnxColorLine), 0);
   lv_obj_set_style_border_opa(hint_line, LV_OPA_COVER, 0);
   lv_obj_set_style_border_width(hint_line, 1, 0);
   lv_obj_set_style_border_side(hint_line, LV_BORDER_SIDE_TOP, 0);
-  lv_obj_set_style_pad_top(hint_line, 8, 0);
+  lv_obj_set_style_pad_top(hint_line, cover_page ? 0 : 8, 0);
   lv_obj_clear_flag(hint_line, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_clear_flag(hint_line, LV_OBJ_FLAG_CLICKABLE);
   enable_touch_bubble(hint_line);
@@ -2126,7 +2127,12 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
   preview_image_visible_ = has_page2_image;
 
   if (preview_text_image_mode_ != has_page2_image) {
-    if (has_page2_image) {
+    if (kOnxUiLayout) {
+      lv_obj_set_pos(page2_image_, 12, 60);
+      lv_obj_set_pos(page2_note_, 30, 194);
+      lv_obj_set_pos(page2_subnote_, 12, 372);
+      lv_obj_set_size(page2_subnote_, 296, 48);
+    } else if (has_page2_image) {
       // Note is hidden when cover is loaded; subnote (title) moves to former note position.
       lv_obj_align(page2_subnote_, LV_ALIGN_CENTER, 0, kPage2NoteWithImageY);
     } else {
@@ -2142,6 +2148,16 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
   set_hidden(page2_subnote_, preview_subnote.empty());
   if (!preview_subnote.empty()) {
     set_label_text_if_changed(page2_subnote_, preview_subnote);
+  }
+  if (kOnxUiLayout && page2_detail_label_ != nullptr) {
+    std::string preview_detail =
+        !snapshot.cloud_detail.empty() ? snapshot.cloud_detail :
+        (!snapshot.preview_hint.empty() ? snapshot.preview_hint :
+         (!has_page2_image ? preview_note : std::string{}));
+    set_hidden(page2_detail_label_, preview_detail.empty());
+    if (!preview_detail.empty()) {
+      set_label_text_if_changed(page2_detail_label_, preview_detail);
+    }
   }
 
   bool has_camera_image =
@@ -2201,7 +2217,34 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
   camera_image_visible_ = has_camera_image;
 
   if (camera_text_image_mode_ != has_camera_image) {
-    if (has_camera_image) {
+    if (kOnxUiLayout) {
+      if (has_camera_image) {
+        lv_obj_set_pos(page3_note_, 12, 48);
+        lv_obj_set_size(page3_note_, 180, 24);
+        lv_obj_set_width(page3_note_, 180);
+        lv_obj_set_style_text_align(page3_note_, LV_TEXT_ALIGN_LEFT, 0);
+        lv_obj_set_style_bg_color(page3_note_, lv_color_hex(kOnxColorPanel), 0);
+        lv_obj_set_style_bg_opa(page3_note_, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_color(page3_note_, lv_color_hex(kOnxColorLine), 0);
+        lv_obj_set_style_border_opa(page3_note_, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(page3_note_, 1, 0);
+        lv_obj_set_style_radius(page3_note_, 12, 0);
+        lv_obj_set_style_pad_hor(page3_note_, 10, 0);
+        lv_obj_set_style_pad_ver(page3_note_, 4, 0);
+      } else {
+        lv_obj_set_pos(page3_note_, 30, 154);
+        lv_obj_set_size(page3_note_, 260, 48);
+        lv_obj_set_width(page3_note_, 260);
+        lv_obj_set_style_text_align(page3_note_, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_set_style_bg_opa(page3_note_, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_opa(page3_note_, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_pad_hor(page3_note_, 0, 0);
+        lv_obj_set_style_pad_ver(page3_note_, 0, 0);
+        lv_obj_set_style_text_color(page3_note_, lv_color_hex(kOnxColorSoft), 0);
+      }
+      lv_obj_set_pos(page3_subnote_, 0, 0);
+      lv_obj_set_width(page3_subnote_, 276);
+    } else if (has_camera_image) {
       // Status note moves above the image; layer/subnote sits below.
       lv_obj_align(page3_note_, LV_ALIGN_CENTER, 0, kPage3StatusAboveImageY);
       lv_obj_align(page3_subnote_, LV_ALIGN_CENTER, 0, kPage3NoteWithImageY);
@@ -2214,6 +2257,9 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
   set_hidden(page3_note_, camera_note.empty());
   if (!camera_note.empty()) {
     set_label_text_if_changed(page3_note_, camera_note);
+    if (kOnxUiLayout && !has_camera_image) {
+      lv_obj_set_style_text_color(page3_note_, lv_color_hex(kOnxColorSoft), 0);
+    }
   }
   set_hidden(page3_subnote_, camera_subnote.empty());
   if (!camera_subnote.empty()) {
@@ -2222,7 +2268,8 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
     const bool subnote_is_layer =
         has_camera_image && (snapshot.total_layers > 0 || snapshot.current_layer > 0);
     lv_obj_set_style_text_font(page3_subnote_,
-                               subnote_is_layer ? &dosis_32 : &lv_font_montserrat_20, 0);
+                               (!kOnxUiLayout && subnote_is_layer) ? &dosis_32 :
+                               &lv_font_montserrat_20, 0);
     set_label_text_if_changed(page3_subnote_, camera_subnote);
   }
 
@@ -3516,12 +3563,21 @@ esp_err_t Ui::build_dashboard() {
   lv_obj_set_style_text_font(portal_overlay_detail_, dosis20, 0);
   lv_obj_set_style_text_color(portal_overlay_detail_, lv_color_hex(0xCBD5E1), 0);
 
-  page2_shell_ = nullptr;
+  if (kOnxUiLayout) {
+    page2_shell_ = create_onx_panel(page2_, 12, 60, 296, 296, kOnxColorPanel);
+  } else {
+    page2_shell_ = nullptr;
+  }
 
   page2_image_ = lv_image_create(page2_);
-  lv_obj_set_size(page2_image_, kPage2PreviewSize, kPage2PreviewSize);
+  lv_obj_set_size(page2_image_, kOnxUiLayout ? 296 : kPage2PreviewSize,
+                  kOnxUiLayout ? 296 : kPage2PreviewSize);
   lv_image_set_inner_align(page2_image_, LV_IMAGE_ALIGN_CONTAIN);
-  lv_obj_align(page2_image_, LV_ALIGN_CENTER, 0, kPage2PreviewYOffset);
+  if (kOnxUiLayout) {
+    lv_obj_set_pos(page2_image_, 12, 60);
+  } else {
+    lv_obj_align(page2_image_, LV_ALIGN_CENTER, 0, kPage2PreviewYOffset);
+  }
   lv_obj_add_flag(page2_image_, LV_OBJ_FLAG_HIDDEN);
   lv_obj_clear_flag(page2_image_, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_clear_flag(page2_image_, LV_OBJ_FLAG_SCROLLABLE);
@@ -3529,29 +3585,77 @@ esp_err_t Ui::build_dashboard() {
 
   page2_note_ = lv_label_create(page2_);
   set_label_text_if_changed(page2_note_, "No cover image yet");
-  lv_obj_set_width(page2_note_, 280);
+  lv_obj_set_width(page2_note_, kOnxUiLayout ? 260 : 280);
   lv_label_set_long_mode(page2_note_, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_align(page2_note_, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_set_style_text_font(page2_note_, dosis20, 0);
-  lv_obj_set_style_text_color(page2_note_, lv_color_hex(0x888888), 0);
-  lv_obj_align(page2_note_, LV_ALIGN_CENTER, 0, -14);
+  lv_obj_set_style_text_font(page2_note_, kOnxUiLayout ? info20 : dosis20, 0);
+  lv_obj_set_style_text_color(page2_note_,
+                              lv_color_hex(kOnxUiLayout ? kOnxColorSoft : 0x888888), 0);
+  if (kOnxUiLayout) {
+    lv_obj_set_pos(page2_note_, 30, 194);
+  } else {
+    lv_obj_align(page2_note_, LV_ALIGN_CENTER, 0, -14);
+  }
   enable_touch_bubble(page2_note_);
 
   page2_subnote_ = lv_label_create(page2_);
   set_label_text_if_changed(page2_subnote_, "");
-  lv_obj_set_width(page2_subnote_, 320);
-  lv_label_set_long_mode(page2_subnote_, LV_LABEL_LONG_SCROLL_CIRCULAR);
-  lv_obj_set_style_text_align(page2_subnote_, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_width(page2_subnote_, kOnxUiLayout ? 296 : 320);
+  lv_label_set_long_mode(page2_subnote_,
+                         kOnxUiLayout ? LV_LABEL_LONG_WRAP : LV_LABEL_LONG_SCROLL_CIRCULAR);
+  lv_obj_set_style_text_align(page2_subnote_,
+                              kOnxUiLayout ? LV_TEXT_ALIGN_LEFT : LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_style_text_font(page2_subnote_, info20, 0);
-  lv_obj_set_style_text_color(page2_subnote_, lv_color_hex(0x888888), 0);
-  lv_obj_align(page2_subnote_, LV_ALIGN_CENTER, 0, 18);
+  lv_obj_set_style_text_color(page2_subnote_,
+                              lv_color_hex(kOnxUiLayout ? kOnxColorText : 0x888888), 0);
+  if (kOnxUiLayout) {
+    lv_obj_set_pos(page2_subnote_, 12, 372);
+    lv_obj_set_size(page2_subnote_, 296, 48);
+  } else {
+    lv_obj_align(page2_subnote_, LV_ALIGN_CENTER, 0, 18);
+  }
   lv_obj_add_flag(page2_subnote_, LV_OBJ_FLAG_HIDDEN);
   enable_touch_bubble(page2_subnote_);
 
+  if (kOnxUiLayout) {
+    page2_detail_label_ = lv_label_create(page2_);
+    set_label_text_if_changed(page2_detail_label_, "");
+    lv_obj_set_pos(page2_detail_label_, 12, 428);
+    lv_obj_set_size(page2_detail_label_, 296, 20);
+    lv_label_set_long_mode(page2_detail_label_, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_align(page2_detail_label_, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_style_text_font(page2_detail_label_, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(page2_detail_label_, lv_color_hex(kOnxColorMuted), 0);
+    lv_obj_add_flag(page2_detail_label_, LV_OBJ_FLAG_HIDDEN);
+    enable_touch_bubble(page2_detail_label_);
+  } else {
+    page2_detail_label_ = nullptr;
+  }
+
+  if (kOnxUiLayout) {
+    page3_shell_ = create_onx_panel(page3_, 12, 86, 296, 166, kOnxColorPanel);
+    page3_info_panel_ = lv_obj_create(page3_);
+    lv_obj_set_pos(page3_info_panel_, 12, 270);
+    lv_obj_set_size(page3_info_panel_, 296, 120);
+    make_transparent(page3_info_panel_);
+    lv_obj_clear_flag(page3_info_panel_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(page3_info_panel_, LV_OBJ_FLAG_SCROLLABLE);
+    enable_touch_bubble(page3_info_panel_);
+  } else {
+    page3_shell_ = nullptr;
+    page3_info_panel_ = nullptr;
+  }
+
   page3_image_ = lv_image_create(page3_);
-  lv_obj_set_size(page3_image_, board::kDisplayWidth, kPage3CameraHeight);
-  lv_image_set_inner_align(page3_image_, LV_IMAGE_ALIGN_CENTER);
-  lv_obj_align(page3_image_, LV_ALIGN_CENTER, 0, kPage3CameraYOffset);
+  lv_obj_set_size(page3_image_, kOnxUiLayout ? 296 : board::kDisplayWidth,
+                  kOnxUiLayout ? 166 : kPage3CameraHeight);
+  lv_image_set_inner_align(page3_image_,
+                           kOnxUiLayout ? LV_IMAGE_ALIGN_CONTAIN : LV_IMAGE_ALIGN_CENTER);
+  if (kOnxUiLayout) {
+    lv_obj_set_pos(page3_image_, 12, 86);
+  } else {
+    lv_obj_align(page3_image_, LV_ALIGN_CENTER, 0, kPage3CameraYOffset);
+  }
   lv_obj_add_flag(page3_image_, LV_OBJ_FLAG_HIDDEN);
   lv_obj_clear_flag(page3_image_, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_clear_flag(page3_image_, LV_OBJ_FLAG_SCROLLABLE);
@@ -3559,26 +3663,63 @@ esp_err_t Ui::build_dashboard() {
 
   page3_note_ = lv_label_create(page3_);
   set_label_text_if_changed(page3_note_, "Tap for new image");
-  lv_obj_set_width(page3_note_, 320);
+  lv_obj_set_width(page3_note_, kOnxUiLayout ? 180 : 320);
   lv_label_set_long_mode(page3_note_, LV_LABEL_LONG_WRAP);
-  lv_obj_set_style_text_align(page3_note_, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_text_align(page3_note_, kOnxUiLayout ? LV_TEXT_ALIGN_LEFT : LV_TEXT_ALIGN_CENTER,
+                              0);
   // Match the main-page status label (dosis32 / white) so the lifecycle status
   // line on the camera page reads consistently across pages.
-  lv_obj_set_style_text_font(page3_note_, dosis32, 0);
-  lv_obj_set_style_text_color(page3_note_, lv_color_hex(0xFFFFFF), 0);
-  lv_obj_align(page3_note_, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_set_style_text_font(page3_note_, kOnxUiLayout ? info20 : dosis32, 0);
+  lv_obj_set_style_text_color(page3_note_,
+                              lv_color_hex(kOnxUiLayout ? kOnxColorSoft : 0xFFFFFF), 0);
+  if (kOnxUiLayout) {
+    lv_obj_set_pos(page3_note_, 30, 154);
+    lv_obj_set_size(page3_note_, 260, 48);
+    lv_obj_set_width(page3_note_, 260);
+    lv_obj_set_style_text_align(page3_note_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_bg_opa(page3_note_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_opa(page3_note_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_pad_hor(page3_note_, 0, 0);
+    lv_obj_set_style_pad_ver(page3_note_, 0, 0);
+  } else {
+    lv_obj_align(page3_note_, LV_ALIGN_CENTER, 0, 0);
+  }
   enable_touch_bubble(page3_note_);
 
-  page3_subnote_ = lv_label_create(page3_);
+  page3_subnote_ = lv_label_create(kOnxUiLayout ? page3_info_panel_ : page3_);
   set_label_text_if_changed(page3_subnote_, "Auto-refresh every 2s");
-  lv_obj_set_width(page3_subnote_, 320);
+  lv_obj_set_width(page3_subnote_, kOnxUiLayout ? 276 : 320);
   lv_label_set_long_mode(page3_subnote_, LV_LABEL_LONG_WRAP);
-  lv_obj_set_style_text_align(page3_subnote_, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_text_align(page3_subnote_,
+                              kOnxUiLayout ? LV_TEXT_ALIGN_LEFT : LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_style_text_font(page3_subnote_, info20, 0);
-  lv_obj_set_style_text_color(page3_subnote_, lv_color_hex(0x888888), 0);
-  lv_obj_align(page3_subnote_, LV_ALIGN_CENTER, 0, 28);
+  lv_obj_set_style_text_color(page3_subnote_,
+                              lv_color_hex(kOnxUiLayout ? kOnxColorSoft : 0x888888), 0);
+  if (kOnxUiLayout) {
+    lv_obj_set_pos(page3_subnote_, 0, 0);
+  } else {
+    lv_obj_align(page3_subnote_, LV_ALIGN_CENTER, 0, 28);
+  }
   lv_obj_add_flag(page3_subnote_, LV_OBJ_FLAG_HIDDEN);
   enable_touch_bubble(page3_subnote_);
+
+  if (kOnxUiLayout) {
+    page3_info_hint_ = lv_label_create(page3_info_panel_);
+    set_label_text_if_changed(page3_info_hint_, "Auto-refresh while open");
+    lv_obj_set_pos(page3_info_hint_, 0, 42);
+    lv_obj_set_width(page3_info_hint_, 296);
+    lv_label_set_long_mode(page3_info_hint_, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_font(page3_info_hint_, info20, 0);
+    lv_obj_set_style_text_color(page3_info_hint_, lv_color_hex(kOnxColorMuted), 0);
+
+    page3_source_label_ = lv_label_create(page3_info_panel_);
+    set_label_text_if_changed(page3_source_label_, "Source: local JPEG snapshot");
+    lv_obj_set_pos(page3_source_label_, 0, 78);
+    lv_obj_set_width(page3_source_label_, 296);
+    lv_label_set_long_mode(page3_source_label_, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_font(page3_source_label_, info20, 0);
+    lv_obj_set_style_text_color(page3_source_label_, lv_color_hex(kOnxColorMuted), 0);
+  }
 
   lv_obj_add_event_cb(screen_, &Ui::screen_event_cb, LV_EVENT_ALL, this);
   lv_obj_update_layout(pager_);
