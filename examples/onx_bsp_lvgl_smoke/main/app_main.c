@@ -1,9 +1,15 @@
 #include "bsp/esp32_s3_touch_amoled_1_75.h"
+#include "esp_err.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "lvgl.h"
+#include "onx3248g035_bsp.h"
 #include <stdio.h>
 
 static const char *TAG = "onx_bsp_lvgl_smoke";
+
+#define LVGL_ISOLATION_PREFILL_HOLD_MS 10000
 
 static lv_obj_t *s_touch_status;
 
@@ -85,6 +91,7 @@ static void create_touch_target(lv_obj_t *parent,
     lv_obj_set_style_pad_all(box, 4, 0);
     lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(box, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(box, screen_touch_cb, LV_EVENT_PRESSED, NULL);
 
     lv_obj_t *label = lv_label_create(box);
     lv_label_set_text(label, label_text);
@@ -93,6 +100,8 @@ static void create_touch_target(lv_obj_t *parent,
     lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_center(label);
+    lv_obj_add_flag(label, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(label, screen_touch_cb, LV_EVENT_PRESSED, NULL);
 }
 
 static void create_validation_screen(void)
@@ -125,6 +134,22 @@ static void create_validation_screen(void)
 
 void app_main(void)
 {
+    ESP_LOGI(TAG, "LVGL Isolation 3: backlight-visible-state parity");
+    esp_err_t backlight_err = onx_bsp_backlight_init();
+    ESP_LOGI(TAG, "LVGL isolation prefill backlight init=%s", esp_err_to_name(backlight_err));
+    if (backlight_err == ESP_OK) {
+        backlight_err = onx_bsp_backlight_set(100);
+        ESP_LOGI(TAG, "LVGL isolation prefill backlight set 100=%s brightness=%u",
+                 esp_err_to_name(backlight_err), onx_bsp_backlight_get());
+    }
+
+    ESP_LOGI(TAG, "LVGL isolation prefill: direct raw color bars before LVGL start");
+    esp_err_t prefill_err = onx_bsp_lcd_fill_bars();
+    ESP_LOGI(TAG, "LVGL isolation prefill draw complete/result=%s", esp_err_to_name(prefill_err));
+    ESP_LOGI(TAG, "LVGL isolation prefill hold start: ms=%d", LVGL_ISOLATION_PREFILL_HOLD_MS);
+    vTaskDelay(pdMS_TO_TICKS(LVGL_ISOLATION_PREFILL_HOLD_MS));
+    ESP_LOGI(TAG, "LVGL isolation prefill hold end; entering bsp_display_start_with_config()");
+
     bsp_display_cfg_t cfg = {
         .lv_adapter_cfg = ESP_LV_ADAPTER_DEFAULT_CONFIG(),
         .rotation = ESP_LV_ADAPTER_ROTATE_0,

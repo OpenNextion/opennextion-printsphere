@@ -8,6 +8,7 @@ set(ONX_BSP_REQUIRES
     esp_driver_i2c
     esp_driver_ledc
     esp_driver_spi
+    esp_adc
     esp_lcd
     esp_timer
 )

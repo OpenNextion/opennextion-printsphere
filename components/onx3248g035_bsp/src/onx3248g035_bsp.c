@@ -6,6 +6,7 @@
 #include "driver/i2c_master.h"
 #include "driver/ledc.h"
 #include "driver/spi_master.h"
+#include "esp_adc/adc_oneshot.h"
 #include "esp_check.h"
 #include "esp_heap_caps.h"
 #include "esp_lcd_io_spi.h"
@@ -39,9 +40,10 @@ static const char *TAG = "onx_bsp";
 #define RGB565_YELLOW 0xFFE0
 
 /*
- * ONX official ST7796U examples use BGR element order and then apply a
- * horizontal mirror in the LVGL display configuration. This smoke firmware
- * draws directly to GRAM, so the equivalent panel-side scan setting is MX+BGR.
+ * Recovery Candidate A: restore the historically visible MX+BGR controller
+ * state while keeping the panel-wrapper RGB565 byte-order conversion and DMA
+ * queue drain. This isolates whether the current blank LVGL screen is tied to
+ * MADCTL=0x08.
  */
 #define ONX_LCD_MADCTL_VALUE (LCD_CMD_MX_BIT | LCD_CMD_BGR_BIT)
 #define ONX_LCD_COLMOD_VALUE 0x55
@@ -69,6 +71,7 @@ static i2c_master_bus_handle_t s_i2c_bus;
 static i2c_master_dev_handle_t s_pcf8574_dev;
 static i2c_master_dev_handle_t s_cst826_dev;
 static esp_lcd_panel_io_handle_t s_lcd_io;
+static adc_oneshot_unit_handle_t s_bat_adc_unit;
 static uint8_t s_pcf8574_state = 0xFF;
 static uint8_t s_backlight_percent;
 static bool s_pcf8574_ready;
@@ -76,6 +79,7 @@ static bool s_spi_bus_ready;
 static bool s_lcd_ready;
 static bool s_backlight_ready;
 static bool s_touch_ready;
+static bool s_bat_adc_ready;
 
 static const font5x7_glyph_t s_font5x7[] = {
     {'A', {0x0E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11}},
@@ -635,6 +639,36 @@ esp_err_t onx_bsp_backlight_set(uint8_t brightness_percent)
 uint8_t onx_bsp_backlight_get(void)
 {
     return s_backlight_percent;
+}
+
+esp_err_t onx_bsp_battery_adc_read_raw(int *raw, int *adc_mv_uncalibrated)
+{
+    ESP_RETURN_ON_FALSE(raw != NULL, ESP_ERR_INVALID_ARG, TAG, "raw is null");
+
+    if (!s_bat_adc_ready) {
+        adc_oneshot_unit_init_cfg_t unit_cfg = {
+            .unit_id = ADC_UNIT_1,
+            .clk_src = ADC_RTC_CLK_SRC_DEFAULT,
+            .ulp_mode = ADC_ULP_MODE_DISABLE,
+        };
+        ESP_RETURN_ON_ERROR(adc_oneshot_new_unit(&unit_cfg, &s_bat_adc_unit), TAG, "battery ADC unit init failed");
+
+        adc_oneshot_chan_cfg_t chan_cfg = {
+            .atten = ADC_ATTEN_DB_12,
+            .bitwidth = ADC_BITWIDTH_DEFAULT,
+        };
+        ESP_RETURN_ON_ERROR(adc_oneshot_config_channel(s_bat_adc_unit, ADC_CHANNEL_3, &chan_cfg),
+                            TAG, "battery ADC channel config failed");
+        s_bat_adc_ready = true;
+        ESP_LOGI(TAG, "Battery ADC ready: gpio=%d adc_unit=%d channel=%d atten=12dB",
+                 ONX_PIN_BAT_ADC, ONX_BAT_ADC_UNIT, ONX_BAT_ADC_CHANNEL);
+    }
+
+    ESP_RETURN_ON_ERROR(adc_oneshot_read(s_bat_adc_unit, ADC_CHANNEL_3, raw), TAG, "battery ADC read failed");
+    if (adc_mv_uncalibrated) {
+        *adc_mv_uncalibrated = (*raw * 3300) / 4095;
+    }
+    return ESP_OK;
 }
 
 static esp_err_t cst826_read(uint8_t reg, uint8_t *data, size_t len)

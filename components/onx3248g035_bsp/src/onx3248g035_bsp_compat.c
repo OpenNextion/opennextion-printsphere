@@ -1,3 +1,4 @@
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <sys/cdefs.h>
@@ -30,6 +31,8 @@ esp_err_t bsp_display_brightness_set(int brightness_percent);
 #define ONX_BSP_HAS_LVGL 0
 #endif
 
+#define ONX_PANEL_RECOVERY_A_MADCTL (LCD_CMD_MX_BIT | LCD_CMD_BGR_BIT)
+
 #if ONX_BSP_HAS_LVGL
 lv_display_t *onx_bsp_lvgl_start(bsp_display_cfg_t *cfg);
 lv_indev_t *onx_bsp_lvgl_get_input_dev(void);
@@ -40,12 +43,19 @@ void onx_bsp_lvgl_unlock(void);
 typedef struct {
     esp_lcd_panel_t base;
     esp_lcd_panel_io_handle_t io;
+    uint8_t madctl;
 } onx_lcd_panel_t;
 
 static esp_lcd_panel_handle_t s_panel_handle;
+static uint32_t s_panel_draw_count;
 
 static uint16_t panel_pack_rgb565(uint16_t rgb565)
 {
+    /*
+     * The ONX SPI panel expects RGB565 payload bytes in bus order. Keep this
+     * conversion in the panel wrapper so both LVGL and esp_lcd_panel callers
+     * use the same transport path.
+     */
     return __builtin_bswap16(rgb565);
 }
 
@@ -77,6 +87,16 @@ static esp_err_t panel_tx_window(esp_lcd_panel_io_handle_t io,
     ESP_RETURN_ON_ERROR(esp_lcd_panel_io_tx_color(io, LCD_CMD_RAMWR, color_data, bytes),
                         TAG, "panel RAMWR failed");
     return ESP_OK;
+}
+
+static esp_err_t panel_drain_color_queue(esp_lcd_panel_io_handle_t io)
+{
+    /*
+     * ESP-IDF's SPI panel IO queues tx_color() as a DMA background transfer.
+     * A tx_param() call with lcd_cmd=-1 is documented to wait until queued
+     * color transfers finish before returning, without sending an LCD command.
+     */
+    return esp_lcd_panel_io_tx_param(io, -1, NULL, 0);
 }
 
 static esp_err_t onx_panel_del(esp_lcd_panel_t *panel)
@@ -116,12 +136,19 @@ static esp_err_t onx_panel_draw_bitmap(esp_lcd_panel_t *panel,
     ESP_RETURN_ON_FALSE(x_start < x_end && y_start < y_end, ESP_ERR_INVALID_ARG, TAG, "empty panel draw window");
 
     onx_lcd_panel_t *onx_panel = __containerof(panel, onx_lcd_panel_t, base);
+    const uint32_t draw_id = ++s_panel_draw_count;
     const int width = x_end - x_start;
     const int height = y_end - y_start;
     const int chunk_rows_max = 16;
     const int chunk_pixels = width * ((height < chunk_rows_max) ? height : chunk_rows_max);
     uint16_t *staging = heap_caps_malloc(chunk_pixels * sizeof(uint16_t), MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
     ESP_RETURN_ON_FALSE(staging != NULL, ESP_ERR_NO_MEM, TAG, "panel staging allocation failed");
+    if (draw_id <= 10) {
+        ESP_LOGI(TAG,
+                 "panel draw #%" PRIu32 ": window=(%d,%d)-(%d,%d) size=%dx%d chunk_rows=%d chunk_pixels=%d staging=%p madctl=0x%02X",
+                 draw_id, x_start, y_start, x_end, y_end, width, height,
+                 chunk_rows_max, chunk_pixels, staging, onx_panel->madctl);
+    }
 
     const uint16_t *src = (const uint16_t *)color_data;
     for (int row = 0; row < height; row += chunk_rows_max) {
@@ -138,6 +165,19 @@ static esp_err_t onx_panel_draw_bitmap(esp_lcd_panel_t *panel,
                                         y_start + row + chunk_rows,
                                         staging,
                                         pixels * sizeof(uint16_t));
+        if (draw_id <= 3) {
+            ESP_LOGI(TAG, "panel draw #%" PRIu32 " chunk row=%d rows=%d pixels=%d tx=%s",
+                     draw_id, row, chunk_rows, pixels, esp_err_to_name(err));
+        }
+        if (err != ESP_OK) {
+            free(staging);
+            return err;
+        }
+        err = panel_drain_color_queue(onx_panel->io);
+        if (draw_id <= 3) {
+            ESP_LOGI(TAG, "panel draw #%" PRIu32 " chunk row=%d drain=%s",
+                     draw_id, row, esp_err_to_name(err));
+        }
         if (err != ESP_OK) {
             free(staging);
             return err;
@@ -161,13 +201,23 @@ static esp_err_t onx_panel_invert_color(esp_lcd_panel_t *panel, bool invert_colo
 
 static esp_err_t onx_panel_mirror(esp_lcd_panel_t *panel, bool x_axis, bool y_axis)
 {
-    (void)panel;
-    if (x_axis && !y_axis) {
-        return ESP_OK;
+    ESP_RETURN_ON_FALSE(panel != NULL, ESP_ERR_INVALID_ARG, TAG, "panel is null");
+    if (y_axis) {
+        ESP_LOGW(TAG, "ONX panel mirror_y is not enabled without a dedicated visual validation run");
+        return ESP_ERR_NOT_SUPPORTED;
     }
-    ESP_LOGW(TAG, "ONX M3 panel keeps verified MADCTL=MX|BGR; requested mirror=%d,%d",
-             x_axis ? 1 : 0, y_axis ? 1 : 0);
-    return ESP_ERR_NOT_SUPPORTED;
+
+    onx_lcd_panel_t *onx_panel = __containerof(panel, onx_lcd_panel_t, base);
+    uint8_t madctl = onx_panel->madctl;
+    madctl |= LCD_CMD_BGR_BIT;
+    madctl = x_axis ? (madctl | LCD_CMD_MX_BIT) : madctl;
+
+    ESP_RETURN_ON_ERROR(esp_lcd_panel_io_tx_param(onx_panel->io, LCD_CMD_MADCTL, &madctl, sizeof(madctl)),
+                        TAG, "panel MADCTL mirror update failed");
+    onx_panel->madctl = madctl;
+    ESP_LOGI(TAG, "ONX panel MADCTL updated by mirror: value=0x%02X mirror_x=%d mirror_y=0",
+             madctl, x_axis ? 1 : 0);
+    return ESP_OK;
 }
 
 static esp_err_t onx_panel_swap_xy(esp_lcd_panel_t *panel, bool swap_axes)
@@ -222,6 +272,7 @@ static esp_err_t onx_panel_new(esp_lcd_panel_handle_t *ret_panel, esp_lcd_panel_
         onx_lcd_panel_t *panel = calloc(1, sizeof(onx_lcd_panel_t));
         ESP_RETURN_ON_FALSE(panel != NULL, ESP_ERR_NO_MEM, TAG, "panel allocation failed");
         panel->io = io;
+        panel->madctl = ONX_PANEL_RECOVERY_A_MADCTL;
         panel->base.del = onx_panel_del;
         panel->base.reset = onx_panel_reset;
         panel->base.init = onx_panel_init;

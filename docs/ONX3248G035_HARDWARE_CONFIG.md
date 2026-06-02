@@ -1,7 +1,8 @@
 # ONX3248G035 Hardware Configuration
 
 This document records the BSP hardware configuration used by the ONX BSP smoke
-firmware.
+firmware and tracks LCD configuration candidates while visual validation is in
+progress.
 
 ## LCD
 
@@ -24,32 +25,46 @@ firmware.
 The BSP sets the ST7796U state explicitly in
 `components/onx3248g035_bsp/src/onx3248g035_bsp.c`.
 
-- Final configuration symbols:
+- Configuration symbols under test:
   - `ONX_LCD_MADCTL_VALUE`.
   - `ONX_LCD_COLMOD_VALUE`.
   - `ONX_LCD_INVERT_CMD`.
   - `lcd_pack_rgb565()`.
 - `COLMOD`: `0x55`, 16-bit RGB565 pixels.
-- `MADCTL`: `LCD_CMD_MX_BIT | LCD_CMD_BGR_BIT`, value `0x48`.
-- `MX`: enabled. The smoke firmware draws directly to GRAM, so this applies
-  the horizontal mirror that the official LVGL example applies in its display
-  rotation configuration.
+- Current panel-init `MADCTL`: `LCD_CMD_MX_BIT | LCD_CMD_BGR_BIT`, value
+  `0x48`.
+- Current LVGL display mirror: not applied; LVGL uses the panel-init
+  `MADCTL=0x48` state.
+- `MX`: enabled by panel init for Recovery Candidate A. Candidate 1 tested the
+  dynamic `mirror_x=1` path from a `0x08` base state; this recovery candidate
+  tests the historical init-time `MX|BGR` path after the panel transport
+  lifetime fix.
 - `MY`: disabled.
 - `MV`: disabled.
 - `BGR`: enabled, matching the official ONX examples that configure
   `LCD_RGB_ELEMENT_ORDER_BGR`.
-- Display inversion: final state is `LCD_CMD_INVOFF`.
+- Display inversion: current state remains `LCD_CMD_INVOFF`.
 
 The official ST7796U component's default vendor init sequence sends `INVON`, but
 the official board LCD initialization then calls `esp_lcd_panel_invert_color`
 with `false`, which sends `INVOFF`. The BSP sends the final `INVOFF` command
 directly at the end of the init sequence.
 
-## Final Configuration Modification Points
+## Candidate Matrix
 
-The final LCD fix is in
-`components/onx3248g035_bsp/src/onx3248g035_bsp.c`, not in the text renderer,
-color labels, or touch target drawing code.
+The candidates are BSP/panel configuration changes, not text renderer, color
+label, touch target drawing, or LVGL UI layout workarounds.
+
+| Candidate | Panel init MADCTL | LVGL dynamic mirror | Intended observation |
+| --- | --- | --- | --- |
+| Baseline before M4 | `MX|BGR` (`0x48`) | no-op `mirror(true,false)` | Known to still show user-visible mirror/display abnormality in LVGL smoke |
+| Candidate 1 | `BGR` (`0x08`) | `mirror_x=1` writes `MX|BGR` (`0x48`) | Tests official-style dynamic mirror path; user still reports abnormality, so not final |
+| Candidate 2 | `BGR` (`0x08`) | no mirror call; final `MADCTL=0x08` | Tests whether LVGL custom flush already has the expected orientation without `MX` |
+| Candidate 3 | `BGR` (`0x08`) | no mirror call; final `MADCTL=0x08` | Moved LVGL RGB565 byte swap to the LVGL flush callback; visual result was no display, so this candidate failed |
+| Candidate 2 + transport fix | `BGR` (`0x08`) | no mirror call; final `MADCTL=0x08` | Restores Candidate 2 RGB565 payload path and keeps the DMA queue drain reliability fix |
+| Recovery Candidate A | `MX|BGR` (`0x48`) | no mirror call; final `MADCTL=0x48` | Restores the historically visible init-time MX+BGR path while keeping the DMA queue drain reliability fix |
+
+## Current Modification Points
 
 Configuration constants:
 
@@ -58,6 +73,39 @@ Configuration constants:
 #define ONX_LCD_COLMOD_VALUE 0x55
 #define ONX_LCD_INVERT_CMD LCD_CMD_INVOFF
 ```
+
+LVGL display mirror state:
+
+```c
+/* no esp_lcd_panel_mirror() call in onx_bsp_lvgl_start() */
+```
+
+LVGL RGB565 payload byte order:
+
+```c
+static uint16_t panel_pack_rgb565(uint16_t rgb565)
+{
+    return __builtin_bswap16(rgb565);
+}
+```
+
+The ONX `esp_lcd_panel_t` wrapper owns LVGL RGB565 SPI byte-order conversion.
+Candidate 3's `lv_draw_sw_rgb565_swap()` flush-callback experiment produced no
+visible display and is not the current validation target.
+
+Panel transport lifetime:
+
+```c
+esp_lcd_panel_io_tx_param(io, -1, NULL, 0);
+```
+
+The panel wrapper drains the ESP-IDF SPI panel IO color-transfer queue after
+each chunk sent by `esp_lcd_panel_io_tx_color()`. This is a transport reliability
+fix: queued SPI DMA transfers may outlive the `tx_color()` call, and the staging
+buffer must not be reused or freed until the queued color transfer is complete.
+It does not change the LCD register state, LVGL mirror state, color constants,
+or address window.
+
 
 Initialization commands:
 
@@ -85,33 +133,40 @@ LCD_CMD_RASET: y_start to y_end - 1
 LCD_CMD_RAMWR: selected-window pixel payload
 ```
 
-Why this resolves the visual defects:
+What Recovery Candidate A is testing:
 
-- `MADCTL.MX` fixes the horizontal mirror seen when drawing directly to GRAM.
+- Whether restoring the historical init-time `MADCTL=MX|BGR` state recovers the
+  LVGL smoke display after both Candidate 3 and Candidate 2 + transport fix
+  produced no visible display.
+- Whether the panel transport lifetime fix can remain enabled without causing a
+  blank screen when the controller scan state returns to `0x48`.
 - `MADCTL.BGR` matches the ONX official BGR panel element order.
-- `INVOFF` fixes the white/black inversion produced by leaving the panel in
-  display-inversion mode.
+- `INVOFF` remains unchanged because the official board layer also ends in
+  inversion disabled.
 - `COLMOD=0x55` keeps the controller in 16-bit RGB565 mode.
-- `lcd_pack_rgb565()` is the only RGB565 SPI payload byte-order conversion
-  point, so color constants stay standard and byte order does not drift across
-  drawing helpers.
+- Direct smoke still uses `lcd_pack_rgb565()` before raw `tx_color` writes.
+- LVGL smoke uses the panel wrapper byte swap before SPI transfer.
 
 ## Defect-to-Configuration Map
 
-The M2 failures were caused by final ST7796U controller state, not by the smoke
-page renderer.
+The observed failures are being tracked as ST7796U controller-state issues, not
+as smoke page renderer issues.
 
-| Observed defect | Root configuration point | Final fix |
+| Observed defect | Root configuration point | Current handling |
 | --- | --- | --- |
-| Text and direction labels horizontally mirrored | `MADCTL.MX` was not represented in the direct-GRAM smoke path | Set `ONX_LCD_MADCTL_VALUE` to include `LCD_CMD_MX_BIT` |
-| Red/blue channel mismatch or color labels not matching visible colors | `MADCTL.BGR` must match the ONX panel element order | Set `ONX_LCD_MADCTL_VALUE` to include `LCD_CMD_BGR_BIT` |
-| White and black inverted | Panel inversion state was left enabled | Send final `LCD_CMD_INVOFF` through `ONX_LCD_INVERT_CMD` |
-| RGB565 words producing wrong colors over SPI | SPI color payload byte order differs from logical `uint16_t` color constants | Use `lcd_pack_rgb565()` before every `tx_color` payload |
+| LVGL text or labels mirrored | `MADCTL.MX` may be required for the local custom LVGL flush path to be visible, but may still mirror text | Recovery Candidate A restores init-time `MX|BGR`; no dynamic mirror call |
+| Red/blue channel mismatch or color labels not matching visible colors | `MADCTL.BGR` must match the ONX panel element order | Keep `LCD_CMD_BGR_BIT` |
+| White and black inverted | Panel inversion state left enabled | Keep final `LCD_CMD_INVOFF` through `ONX_LCD_INVERT_CMD` |
+| RGB565 words producing wrong colors over SPI | SPI color payload byte order differs from logical `uint16_t` color constants | LVGL path uses panel-wrapper byte swap; direct smoke keeps `lcd_pack_rgb565()` |
 | Direction issue tempting coordinate offsets | Address window should express logical portrait coordinates only | Keep `CASET`/`RASET` as `x_start..x_end-1`, `y_start..y_end-1` with no offsets |
 
-The accepted final `MADCTL` value is `0x48`: `MX` (`0x40`) plus `BGR`
-(`0x08`). `MY` and `MV` remain clear, so the controller stays in portrait
-`320 x 480`; the fix does not swap axes or apply a vertical mirror.
+Recovery Candidate A has one relevant LVGL `MADCTL` state:
+
+- Panel init and LVGL runtime: `0x48`, MX plus BGR.
+
+`MY` and `MV` remain clear in this candidate, so the controller stays in
+portrait `320 x 480`; the candidate does not swap axes or apply a vertical
+mirror.
 
 ## RGB565 Bus Byte Order
 
@@ -124,8 +179,18 @@ Logical colors remain standard RGB565 values:
 - Black: `0x0000`.
 
 Before writing pixels through `esp_lcd_panel_io_tx_color`, the BSP byte-swaps
-each RGB565 value in one helper, `lcd_pack_rgb565()`. This matches the official
-sample's use of swapped 16-bit color data for SPI LCD transfers.
+logical RGB565 values at the transport boundary:
+
+- Direct smoke raw path:
+  `components/onx3248g035_bsp/src/onx3248g035_bsp.c` uses
+  `lcd_pack_rgb565()`.
+- LVGL / `esp_lcd_panel_t` wrapper path:
+  `components/onx3248g035_bsp/src/onx3248g035_bsp_compat.c` uses
+  `panel_pack_rgb565()`.
+
+Both helpers currently perform the same `__builtin_bswap16()` conversion. This
+matches the official sample's use of swapped 16-bit color data for SPI LCD
+transfers.
 
 ## Address Window
 
@@ -139,14 +204,14 @@ No x/y gap is currently applied. The smoke firmware validates the full
 `0..319`, `0..479` logical coordinate range.
 
 Do not introduce CASET/RASET gaps, coordinate offsets, or draw-time mirroring as
-a substitute for the verified MADCTL/INVOFF/RGB565 configuration above. Any
-future panel-handle or LVGL adapter path must preserve this portrait coordinate
-system unless a new hardware validation run records a different result.
+a substitute for the MADCTL/INVOFF/RGB565 configuration under test. Any future
+panel-handle or LVGL adapter path must preserve this portrait coordinate system
+unless a new hardware validation run records a different result.
 
 The M3 LVGL adapter follows the same rule: LVGL flushes through the ONX
-`esp_lcd_panel_handle_t` wrapper, and that wrapper uses the verified LCD init
-state plus the same RGB565 byte-swap before SPI color transfer. LVGL labels,
-color bands, or touch targets must not compensate for mirror, inversion, RGB/BGR
+`esp_lcd_panel_handle_t` wrapper, and Recovery Candidate A uses init-time
+`MX|BGR` while keeping the panel wrapper byte swap. LVGL labels, color bands, or
+touch targets must not compensate for mirror, inversion, RGB/BGR order, byte
 order, or CASET/RASET offset mistakes.
 
 ## Touch
@@ -170,6 +235,26 @@ Accepted touch evidence from M2 showed:
 
 If LCD scan direction is changed later, touch mapping must be revalidated
 against the displayed `TL`, `TR`, `BR`, `BL`, and `CENTER` targets.
+
+Current LVGL touch validation status:
+
+- The LVGL smoke screen displays three touch targets: `TOUCH TOP LEFT`,
+  `TOUCH CENTER`, and `TOUCH BOTTOM RIGHT`.
+- The initial LVGL smoke event handler was attached only to the root screen.
+  The visible target boxes are clickable objects, so tapping the center of a
+  box can be handled by the box or label instead of the screen. That made touch
+  logging unreliable even when the CST826 input path was alive.
+- The LVGL smoke validation program now attaches the same touch callback to the
+  root screen, each touch target box, and each label inside the box. This is a
+  validation-program event routing fix only; it does not change CST826
+  `swap_xy`, `mirror_x`, or `mirror_y`.
+- LVGL touch mapping validation passed after the event-routing fix. Captured
+  examples:
+  - `Touch x=86 y=41 target=TOUCH TOP LEFT`.
+  - `Touch x=182 y=252 target=TOUCH CENTER`.
+  - `Touch x=280 y=450 target=TOUCH BOTTOM RIGHT`.
+- The accepted LVGL touch transform remains `swap_xy=0`, `mirror_x=0`, and
+  `mirror_y=0`.
 
 ## Official ONX Source Comparison
 
@@ -213,8 +298,13 @@ Matches:
 
 Intentional differences:
 
-- The smoke firmware does not use LVGL, so it applies the official LVGL
-  horizontal mirror as ST7796 `MADCTL.MX`.
+- Recovery Candidate A restores the historical init-time `MX|BGR` state and
+  intentionally does not request an additional dynamic LVGL mirror. This is a
+  recovery diagnostic to confirm whether the display can become visible again;
+  it is not a final accepted orientation decision.
+- Candidate 3 tested the LVGL v9 flush-callback RGB565 swap hook, but the user
+  reported no visible display. The current target restores the panel-wrapper
+  byte swap and keeps the transport lifetime drain.
 - The smoke firmware sends final `INVOFF` directly instead of sending `INVON`
   first and then calling the panel API to disable inversion.
 - The smoke firmware packs RGB565 bus byte order in a single helper because it
@@ -250,16 +340,96 @@ Visual pass requires:
 
 ## Visual Result
 
-Final user visual confirmation on 2026-06-02:
+Historical M2 direct-smoke visual confirmation on 2026-06-02:
 
 - Color labels match the visible colors.
 - White and black are correct and not inverted.
 - Touch page text is readable and not mirrored.
 - Touch label positions match expectation.
 
-This confirms the current ST7796U configuration point:
+Current M4 LVGL smoke status:
 
-- `MADCTL=0x48` (`MX | BGR`).
-- `COLMOD=0x55`.
-- Final inversion command: `INVOFF`.
-- RGB565 payloads are byte-swapped before SPI color transfer.
+- The user reported that the current LVGL smoke baseline still shows color or
+  text mirror/orientation problems.
+- Therefore `MADCTL=0x48` preloaded during panel init is no longer treated as a
+  final accepted LVGL configuration.
+- Candidate 2 was built and flashed through the standard `examples/onx_bsp_lvgl_smoke`
+  flow on 2026-06-02 using `/dev/tty.wchusbserial10`, `115200`, and
+  `write-flash @flash_args`; esptool verified the written image hash and hard
+  reset the board.
+- The short post-flash serial capture did not include firmware runtime logs, so
+  the remaining acceptance signal for Candidate 2 is user visual confirmation.
+- Candidate 3 was built and flashed through the standard `examples/onx_bsp_lvgl_smoke`
+  flow on 2026-06-02 using `/dev/tty.wchusbserial10`, `115200`, and
+  `write-flash @flash_args`; esptool verified the written image hash and hard
+  reset the board.
+- After adding the panel transport lifetime drain, Candidate 3 was rebuilt and
+  flashed again through the same standard flow; esptool again verified the
+  written image hash and hard reset the board.
+- The short post-flash serial capture did not include firmware runtime logs, so
+  the remaining acceptance signal for Candidate 3 was user visual confirmation.
+- Candidate 3 visual result: user reported no visible display. Candidate 3 is
+  rejected and must not be marked final.
+- Recovery Candidate A restores the historical init-time `MX|BGR` display state
+  while keeping the panel transport lifetime drain. It was built and flashed
+  through the standard `examples/onx_bsp_lvgl_smoke` flow on 2026-06-02 using
+  `/dev/tty.wchusbserial10`, `115200`, and `write-flash @flash_args`; esptool
+  verified the written image hash and hard reset the board. Short runtime log
+  capture was unavailable because the serial capture approval timed out.
+- Recovery Candidate A visual result: user reported that the screen still did
+  not light and showed no display. Recovery Candidate A is rejected and must not
+  be marked final.
+- Next isolation step: flash the existing direct smoke,
+  `examples/onx_bsp_smoke`, to distinguish LVGL adapter/start/flush failure
+  from lower-level panel init, transport, backlight, or reset failure.
+- Direct smoke isolation result: after flashing `examples/onx_bsp_smoke`
+  through the standard flow, the user reported that display succeeded and the
+  original color bars and touch targets were visible. The direct smoke path
+  explicitly initializes backlight PWM, sets brightness to 30%, initializes the
+  LCD, then sets brightness to 100% before drawing the visible pages.
+- LVGL Isolation 1: `examples/onx_bsp_lvgl_smoke` performs a short direct raw
+  color-bar prefill before starting LVGL. This is a path diagnostic, not a UI
+  workaround: if the prefill appears and LVGL then blanks the screen, the
+  failure is inside LVGL start/flush/panel-wrapper; if the prefill is not
+  visible, the same firmware is failing before LVGL takes over.
+- LVGL Isolation 1 also protects the panel wrapper cached `MADCTL` state as
+  `0x48` so an accidental `mirror(false, false)` call cannot reset Recovery A
+  back to `0x08`.
+- LVGL Isolation 1 build/flash evidence: `examples/onx_bsp_lvgl_smoke` built
+  successfully with binary size `0x8ba80`, then flashed through the standard
+  flow on 2026-06-02 using `/dev/tty.wchusbserial10`, `115200`, and
+  `write-flash @flash_args`; esptool verified the written image hash and hard
+  reset the board.
+- LVGL Isolation 1 runtime log capture was unavailable because the serial
+  capture approval timed out.
+- LVGL Isolation 1 visual timing is unconfirmed: after the firmware was flashed
+  and reset, the user observed a black screen, but could not determine whether
+  the 1.5 second direct raw prefill appeared before observation. Direct smoke
+  remains the confirmed visible raw LCD path.
+- LVGL Isolation 2 is a runtime trace firmware, not a fix candidate. It extends
+  the direct raw prefill hold to 10 seconds and logs prefill start, draw result,
+  hold start, and hold end before entering `bsp_display_start_with_config()`.
+  It also logs `onx_bsp_lvgl_start()` stage progress, the first LVGL flush
+  windows, pixel summaries, return values, LVGL task heartbeat, and the first
+  panel wrapper draw/chunk transfer results. The intended observation is
+  whether direct prefill color bars are visible during the first 10 seconds
+  after reboot, then whether the screen turns black or reaches the LVGL
+  validation page.
+- LVGL Isolation 2 runtime evidence showed app startup, LCD init, direct prefill
+  draw, LVGL start, non-black flushes, panel draw, SPI tx/drain, touch input,
+  and LVGL heartbeat all reporting success. The user still saw black during the
+  10 second prefill window and after LVGL started. That result shifts the next
+  diagnostic away from color, direction, byte order, and LVGL startup toward LCD
+  visible-state parity.
+- LVGL Isolation 3 is a backlight-visible-state parity candidate. It does not
+  change MADCTL, COLMOD, INVOFF, RGB565 byte order, CASET/RASET, LVGL labels,
+  color constants, or touch target layout. It makes `examples/onx_bsp_lvgl_smoke`
+  match the direct smoke visible-state sequence by explicitly initializing
+  backlight and setting brightness to 100% before the direct prefill, then
+  explicitly enabling backlight again after `bsp_display_brightness_init()` in
+  the LVGL adapter start path.
+- LVGL Isolation 3 visual result: user reported that the prefill stripes became
+  visible and then the LVGL touch target overlay appeared. This validates the
+  backlight visible-state fix. The LVGL adapter path must explicitly enable
+  backlight after display start and the LVGL smoke must keep backlight enabled
+  before the diagnostic prefill.

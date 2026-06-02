@@ -140,6 +140,36 @@ This can make `brew list` or install commands fail from inside Codex unless perm
 
 Only one ESP-IDF installation and one documented build flow should be used for this project. Subthreads must not install alternate ESP-IDF versions or use their own private build commands without updating `docs/BUILD_FLASH.md` through the main thread.
 
+## Approval And Escalation Policy
+
+Development threads may flash firmware for assigned hardware or code
+validation, but only through the standard flow in `docs/BUILD_FLASH.md`.
+
+For ONX serial flash, the standard remains:
+
+- Endpoint: `/dev/tty.wchusbserial10`.
+- Baud: `115200`.
+- Reset flags: `--before default-reset --after hard-reset`.
+- Write operation: `write-flash @flash_args`.
+
+Codex `auto_review`, approval pending, or approval timeout means the command was
+not executed. It is not a firmware failure, BSP failure, esptool failure, or
+serial-driver failure. If approval waits longer than about 2 minutes or times
+out, the executing thread should stop and report `approval_not_executed` with
+the exact command and preflight evidence. It should not change ports, baud rate,
+reset flags, flash arguments, ESP-IDF version, partition layout, macOS privacy
+settings, or driver settings.
+
+Flash commands should be written as narrow, approval-friendly steps: activate
+ESP-IDF, build, `cd` into the build directory, then run one direct
+`python -m esptool ... write-flash @flash_args` command. Persistent approval, if
+needed, should be narrow to the standard esptool usage rather than a broad shell
+or arbitrary Python command.
+
+Monitor and capture approvals follow the same rule. Capture commands must be
+short, have an explicit timeout, close the serial port before exit, and leave
+`lsof /dev/cu.wchusbserial10 /dev/tty.wchusbserial10` empty afterward.
+
 ## Standard Checks
 
 Run these before building:
@@ -205,8 +235,67 @@ Verified results:
 - Log capture: short PySerial read at `115200` returned ONX BSP smoke runtime
   logs, including `onx_bsp: Touch sampler still running; waiting for touch`.
 
+## ONX BSP LVGL Smoke Build/Flash Status
+
+The ONX BSP LVGL smoke build flow was verified on 2026-06-02.
+
+Verified build results:
+
+- Project: `/Users/alex/Documents/codex_project/Nextion_project_PrintSphere/examples/onx_bsp_lvgl_smoke`.
+- Environment: `.tools/esp-idf-v6.0.1` with
+  `IDF_TOOLS_PATH=$PWD/.tools/espressif`.
+- Build command: `IDF_COMPONENT_MANAGER=0 idf.py -C examples/onx_bsp_lvgl_smoke build`.
+- Firmware image: `examples/onx_bsp_lvgl_smoke/build/onx_bsp_lvgl_smoke.bin`.
+- Latest verified binary size: `0x8c9c0`.
+- Generated flash args include `--flash-size 16MB`.
+
+Current flash status:
+
+- Standard flow remains `/dev/tty.wchusbserial10`, `115200`,
+  `python -m esptool ... write-flash @flash_args`.
+- Latest standard flash completed with bootloader, partition table, and app hash
+  verification.
+- BSP completed touch capture and reported the LVGL smoke touch mapping passed.
+  Touch-coordinate details are owned by
+  `docs/ONX3248G035_HARDWARE_CONFIG.md`.
+- BSP thread's first standard flash attempt hit `Operation not permitted` on
+  `/dev/tty.wchusbserial10`.
+- Env/Serial/Flash non-invasive checks confirmed both serial nodes exist. A
+  later recheck found a transient Python process holding
+  `/dev/cu.wchusbserial10`; it exited before normal cleanup was needed, and the
+  final `lsof /dev/cu.wchusbserial10 /dev/tty.wchusbserial10` returned no owner.
+- Failure classification order: first clear any `lsof` serial owner; if both
+  endpoints are free and esptool still reports `Operation not permitted`,
+  classify it as a host permission or Codex approval issue, not a BSP source
+  issue and not a reason to change the standard flash command.
+
 Development threads may flash for assigned hardware or code validation, but
 they must use the standard flow in `docs/BUILD_FLASH.md`. If the standard flow
 fails, collect the required evidence and hand the failure to Env/Serial/Flash
 instead of changing ports, baud rate, reset flags, flash arguments, partition
 layout, or ESP-IDF version.
+
+## ONX BSP Board Diagnostics Capture Status
+
+The M4 board diagnostics runtime log capture flow was executed on 2026-06-02.
+
+Current constraints:
+
+- Do not flash or monitor until the main thread or user approves overwriting the
+  currently active validation firmware on the board.
+- Standard diagnostics target:
+  `examples/onx_bsp_board_smoke`.
+- Standard flash endpoint remains `/dev/tty.wchusbserial10`.
+- Standard baud remains `115200`.
+- Standard flash method remains direct `python -m esptool ... write-flash
+  @flash_args` from `examples/onx_bsp_board_smoke/build`.
+
+Current read-only serial check:
+
+- `/dev/cu.wchusbserial10` exists.
+- `/dev/tty.wchusbserial10` exists.
+- `lsof /dev/cu.wchusbserial10 /dev/tty.wchusbserial10` returned no owner during
+  the capture-plan check.
+
+Runtime log capture must follow `docs/BUILD_FLASH.md` and should collect both
+startup evidence and at least one 5 second `onx_board_smoke` loop.

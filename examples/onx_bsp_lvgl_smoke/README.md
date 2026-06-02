@@ -13,6 +13,9 @@ labeled validation screen:
 - Touch targets labeled `TOUCH TOP LEFT`, `TOUCH CENTER`, and
   `TOUCH BOTTOM RIGHT`.
 - Serial logs for touch coordinates and inferred target.
+- The root screen, target boxes, and target labels all route touch events to the
+  same logger, so tapping the visible center of a target should print
+  `Touch x=... y=... target=...`.
 
 This is not the PrintSphere app acceptance firmware.
 

@@ -30,6 +30,80 @@ Default rule:
   development threads should report failures; they should not experiment with
   alternate flash procedures.
 
+## Approval / Escalation Policy For Flash And Monitor
+
+Development threads may flash firmware for their assigned hardware or code
+validation, but the permission to flash does not include permission to invent a
+private flow. The standard ONX flash parameters are:
+
+- Endpoint: `/dev/tty.wchusbserial10`.
+- Baud rate: `115200`.
+- Reset flags: `--before default-reset --after hard-reset`.
+- Write operation: `write-flash @flash_args`.
+- `@flash_args` must come from the just-built target build directory.
+
+Approval pending, `auto_review` timeout, or a Codex escalation request that was
+not executed is not a firmware, BSP, esptool, or serial-port failure. If a
+standard flash or monitor escalation waits longer than about 2 minutes, or the
+tool reports that automatic approval did not finish before its deadline, the
+executing thread must stop and report:
+
+- `approval_not_executed` or `approval_timeout`.
+- Firmware target and build directory.
+- Exact command that was waiting for approval.
+- Preflight output, including branch, commit, serial node list, and `lsof`.
+
+Do not respond to approval timeout by changing endpoint, baud rate, reset flags,
+esptool arguments, `@flash_args`, partition layout, ESP-IDF version, macOS
+settings, driver settings, or by repeatedly retrying the request. One clean
+retry is acceptable only when the approval tool explicitly says a retry is
+reasonable; after that, hand the case to Env/Serial/Flash or ask the user to
+approve the pending action.
+
+Only these classes belong in Env/Serial/Flash debugging:
+
+- Serial owner shown by `lsof`.
+- macOS permission denial such as `Operation not permitted`.
+- Missing `/dev/cu.*` or `/dev/tty.*` node.
+- WCH driver or DriverKit binding problems.
+- Actual esptool connection, reset, write, verify, or chip-response errors.
+- Monitor/capture commands that open the port but return no device logs.
+
+For approval-friendly execution, split build and flash into separate shell
+steps. First activate the environment and build. Then change to the build
+directory. Then run a single direct esptool command:
+
+```sh
+cd /Users/alex/Documents/codex_project/Nextion_project_PrintSphere
+export IDF_TOOLS_PATH="$PWD/.tools/espressif"
+export IDF_COMPONENT_MANAGER=0
+. "$PWD/.tools/esp-idf-v6.0.1/export.sh"
+idf.py -C examples/onx_bsp_lvgl_smoke build
+cd examples/onx_bsp_lvgl_smoke/build
+```
+
+```sh
+python -m esptool --chip esp32s3 \
+  -p /dev/tty.wchusbserial10 \
+  -b 115200 \
+  --before default-reset \
+  --after hard-reset \
+  write-flash @flash_args
+```
+
+If persistent approval is needed, ask for the narrowest practical command shape
+for the standard esptool invocation. Prefer approving the standard
+`python -m esptool ... write-flash @flash_args` usage, not a broad shell,
+arbitrary Python script, arbitrary `python -c`, or unrestricted `/bin/zsh -lc`.
+Do not request system-level or persistent approval from a development thread
+unless Env/Serial/Flash or the user has explicitly asked for it.
+
+Monitor and capture follow the same policy. Captures must be short, must include
+an explicit timeout in the command, must close the serial object before exit,
+and must be followed by `lsof /dev/cu.wchusbserial10
+/dev/tty.wchusbserial10`. A capture approval timeout is also
+`approval_not_executed`, not a firmware logging failure.
+
 Before any flash attempt, record these facts in the executing thread:
 
 ```sh
@@ -121,6 +195,28 @@ export IDF_COMPONENT_MANAGER=0
 idf.py -C examples/onx_bsp_smoke build
 ```
 
+For the ONX BSP LVGL smoke project, use the same project-local ESP-IDF
+environment and disable Component Manager:
+
+```sh
+cd /Users/alex/Documents/codex_project/Nextion_project_PrintSphere
+export IDF_TOOLS_PATH="$PWD/.tools/espressif"
+export IDF_COMPONENT_MANAGER=0
+. "$PWD/.tools/esp-idf-v6.0.1/export.sh"
+idf.py -C examples/onx_bsp_lvgl_smoke build
+```
+
+For the ONX BSP board diagnostics project, use the same project-local ESP-IDF
+environment and disable Component Manager:
+
+```sh
+cd /Users/alex/Documents/codex_project/Nextion_project_PrintSphere
+export IDF_TOOLS_PATH="$PWD/.tools/espressif"
+export IDF_COMPONENT_MANAGER=0
+. "$PWD/.tools/esp-idf-v6.0.1/export.sh"
+idf.py -C examples/onx_bsp_board_smoke build
+```
+
 PrintSphere and ONX examples use `idf_component.yml` dependencies, so their normal builds require ESP-IDF Component Manager.
 
 Current verification status:
@@ -136,6 +232,11 @@ Current verification status:
   `IDF_COMPONENT_MANAGER=0`. Main-thread review after the final LCD
   configuration change produced
   `examples/onx_bsp_smoke/build/onx_bsp_smoke.bin`, size `0x3e050`.
+- ONX BSP LVGL smoke build succeeded on 2026-06-02 with
+  `IDF_COMPONENT_MANAGER=0`. Output binary:
+  `examples/onx_bsp_lvgl_smoke/build/onx_bsp_lvgl_smoke.bin`, latest verified
+  size `0x8c9c0`.
+  Its generated `flash_args` includes `--flash-size 16MB`.
 
 Blank smoke-test build command:
 
@@ -231,6 +332,82 @@ Rationale:
 - `@flash_args` comes from the just-built ESP-IDF project and prevents threads from hand-editing bootloader, partition, app offset, flash mode, flash frequency, or flash size.
 - This is the standard ONX BSP smoke flash path. Do not replace it with `idf.py flash`, a higher baud rate, a different endpoint, or hand-written offsets unless this document is updated by Env/Serial/Flash.
 
+Stable ONX BSP LVGL smoke flash command:
+
+Build and enter the target build directory first:
+
+```sh
+cd /Users/alex/Documents/codex_project/Nextion_project_PrintSphere
+export IDF_TOOLS_PATH="$PWD/.tools/espressif"
+export IDF_COMPONENT_MANAGER=0
+. "$PWD/.tools/esp-idf-v6.0.1/export.sh"
+idf.py -C examples/onx_bsp_lvgl_smoke build
+cd examples/onx_bsp_lvgl_smoke/build
+```
+
+Then run the single standard flash command:
+
+```sh
+python -m esptool --chip esp32s3 \
+  -p /dev/tty.wchusbserial10 \
+  -b 115200 \
+  --before default-reset \
+  --after hard-reset \
+  write-flash @flash_args
+```
+
+Current ONX BSP LVGL smoke flash status:
+
+- Build succeeded on 2026-06-02.
+- Firmware: `examples/onx_bsp_lvgl_smoke/build/onx_bsp_lvgl_smoke.bin`.
+- Latest verified binary size: `0x8c9c0`.
+- Generated `flash_args`: `--flash-mode dio --flash-freq 80m --flash-size
+  16MB`, followed by bootloader, partition table, and app offsets.
+- Latest standard flash completed with bootloader, partition table, and app hash
+  verification.
+- BSP completed touch capture and reported the LVGL smoke touch mapping passed.
+  Touch-coordinate details are owned by
+  `docs/ONX3248G035_HARDWARE_CONFIG.md`.
+- BSP thread's first standard flash attempt failed before changing any standard
+  flow parameter because macOS/Codex returned `Operation not permitted` for
+  `/dev/tty.wchusbserial10`.
+- Env/Serial/Flash non-invasive checks after the report found both serial nodes
+  present. An initial `lsof` check returned no owners, a later recheck found a
+  transient Python process holding `/dev/cu.wchusbserial10`, and the process
+  exited before a normal cleanup signal could be applied. Final `lsof
+  /dev/cu.wchusbserial10 /dev/tty.wchusbserial10` returned no owners.
+- Classify this failure path in order: first clear any serial owner reported by
+  `lsof`; if both endpoints are free and esptool still reports `Operation not
+  permitted`, treat it as a host permission or approval issue rather than a BSP
+  source issue or a reason to change the standard flash command.
+
+Stable ONX BSP board diagnostics flash command:
+
+This command overwrites the currently flashed firmware and requires main-thread
+or user approval when another validation image may be active on the board.
+
+Build and enter the target build directory first:
+
+```sh
+cd /Users/alex/Documents/codex_project/Nextion_project_PrintSphere
+export IDF_TOOLS_PATH="$PWD/.tools/espressif"
+export IDF_COMPONENT_MANAGER=0
+. "$PWD/.tools/esp-idf-v6.0.1/export.sh"
+idf.py -C examples/onx_bsp_board_smoke build
+cd examples/onx_bsp_board_smoke/build
+```
+
+Then run the single standard flash command:
+
+```sh
+python -m esptool --chip esp32s3 \
+  -p /dev/tty.wchusbserial10 \
+  -b 115200 \
+  --before default-reset \
+  --after hard-reset \
+  write-flash @flash_args
+```
+
 Repeated ONX BSP smoke flash acceptance on 2026-06-02:
 
 - Branch: `feature/onx-bsp-bringup`.
@@ -320,6 +497,88 @@ ser.close(); sys.stdout.write(data.decode("utf-8", "replace"))'
 If `/dev/tty.wchusbserial10` returns no boot logs, retry the same short capture
 with `/dev/cu.wchusbserial10`. Do not leave monitor sessions running in the
 background.
+
+## Runtime Diagnostics Log Capture
+
+Use this procedure when the assigned validation target is
+`examples/onx_bsp_board_smoke`. It is a runtime log acceptance flow, so do not
+run it until the main thread or user approves overwriting any currently active
+firmware.
+
+Preflight:
+
+```sh
+cd /Users/alex/Documents/codex_project/Nextion_project_PrintSphere
+git status --short
+git branch --show-current
+git log --oneline -1
+ls -l /dev/cu.wchusbserial10 /dev/tty.wchusbserial10
+lsof /dev/cu.wchusbserial10 /dev/tty.wchusbserial10
+```
+
+The `lsof` command must return no owner before flashing or capturing logs. If a
+serial owner is present, close it using the serial-session lifecycle below.
+
+After approval, build and flash the board diagnostics firmware using the stable
+standard command above. Then capture runtime logs with the standard endpoint and
+baud rate:
+
+```sh
+cd /Users/alex/Documents/codex_project/Nextion_project_PrintSphere
+export IDF_TOOLS_PATH="$PWD/.tools/espressif"
+. "$PWD/.tools/esp-idf-v6.0.1/export.sh"
+python -c 'import serial,time,sys; ser=serial.Serial("/dev/tty.wchusbserial10",115200,timeout=0.2); end=time.time()+25; data=bytearray();
+while time.time()<end:
+    chunk=ser.read(4096)
+    if chunk:
+        data.extend(chunk)
+ser.close(); sys.stdout.write(data.decode("utf-8", "replace"))'
+```
+
+This capture must include at least one 5 second repeat loop from
+`onx_board_smoke`. Expected runtime evidence includes:
+
+- `ONX3248G035 board diagnostics smoke start`.
+- `I2C bus ready evidence`.
+- `PCF8574 raw state`.
+- `PCF8574 pin map`.
+- `CHG_N raw`.
+- `TP_INT raw`.
+- `SDCS raw`.
+- `Battery ADC raw-only`.
+- `Backlight check`.
+- `Board diagnostics smoke complete`.
+- `Board diagnostics still running`.
+- `Battery ADC repeat raw-only`.
+
+To avoid missing early boot logs, use one of these two standard approaches:
+
+1. Immediately start the short capture command after the standard flash command
+   finishes. This usually catches runtime loop evidence, but may miss the first
+   boot lines if the board resets before the capture command opens the port.
+2. For startup-log evidence, start the same short capture command first, then
+   press the physical RESET button once within the first two seconds. This keeps
+   the standard endpoint and baud rate unchanged and avoids changing flash
+   reset flags or `@flash_args`.
+
+If the output only shows ESP-IDF environment activation text and no serial
+firmware logs, classify before changing anything:
+
+- Command-wrapper issue: ESP-IDF activation text came from the host shell before
+  Python opened the serial port; rerun the Python capture command alone after
+  activation.
+- Monitor not connected: Python exits with no firmware bytes and no serial
+  exception; verify the command really opens `/dev/tty.wchusbserial10`.
+- Serial occupied: `lsof` shows another process owning either ONX endpoint;
+  close it using the serial-session lifecycle and retry once.
+- Permission issue: Python raises `Operation not permitted`; use the host
+  permission/Codex approval path in Flash Troubleshooting.
+- Firmware log issue: serial opens cleanly, reset-synchronized capture returns
+  bytes from the bootloader but no `onx_board_smoke` lines; hand the evidence to
+  the BSP thread as a firmware logging or boot progression issue.
+- Firmware not flashed: serial opens cleanly but logs identify another project,
+  such as an LVGL smoke image; stop and ask the main thread whether diagnostics
+  firmware overwrite is approved.
 
 ## Serial Session Lifecycle
 
@@ -427,6 +686,7 @@ device reports readiness to read but returned no data
 Could not exclusively lock port
 The chip stopped responding
 Operation not permitted: '/dev/cu.wchusbserial10'
+Operation not permitted: '/dev/tty.wchusbserial10'
 ```
 
 For Env/Serial/Flash diagnosis, use this order:
@@ -443,16 +703,31 @@ For Env/Serial/Flash diagnosis, use this order:
    lsof /dev/cu.wchusbserial10 /dev/tty.wchusbserial10
    ```
 
-3. Wait a few seconds and retry once. macOS may hold a short serial lock after a
+3. If the failure is `Operation not permitted` and `lsof` shows no owner, treat
+   it as a host permission or Codex approval problem, not a flash-flow problem.
+   Do not change endpoint, baud rate, reset flags, `@flash_args`, or partition
+   layout. Re-run the same standard command outside the sandbox through the
+   permission flow, or ask the user to approve terminal/Codex device access.
+4. If macOS blocks serial access outside Codex too, open System Settings and
+   check:
+
+   - Privacy & Security > Files and Folders.
+   - Privacy & Security > Full Disk Access.
+   - Privacy & Security > Developer Tools.
+   - Privacy & Security for any blocked driver or system extension prompt.
+
+   After changing macOS privacy or driver approval, unplug/replug the ONX board
+   and re-run the serial node plus `lsof` checks before flashing.
+5. Wait a few seconds and retry once. macOS may hold a short serial lock after a
    failed esptool or PySerial run.
-4. Release DTR/RTS if the board appears held in reset:
+6. Release DTR/RTS if the board appears held in reset:
 
    ```sh
    python3 -c 'import serial,time; s=serial.Serial("/dev/cu.wchusbserial10",115200,timeout=0.1); s.dtr=False; s.rts=False; time.sleep(0.5); s.close(); print("released DTR/RTS")'
    ```
 
-5. Prefer the stable low-speed `/dev/tty.wchusbserial10` esptool command above.
-6. If the board is stuck in download mode, run:
+7. Prefer the stable low-speed `/dev/tty.wchusbserial10` esptool command above.
+8. If the board is stuck in download mode, run:
 
    ```sh
    cd /Users/alex/Documents/codex_project/Nextion_project_PrintSphere
@@ -461,21 +736,21 @@ For Env/Serial/Flash diagnosis, use this order:
    python -m esptool --chip esp32s3 -p /dev/tty.wchusbserial10 run
    ```
 
-7. If automatic reset fails:
+9. If automatic reset fails:
 
    - Hold BOOT.
    - Press RESET once.
    - Release BOOT.
    - Run the stable low-speed flash command again.
 
-8. If `The chip stopped responding` occurs during app write, do not leave the
+10. If `The chip stopped responding` occurs during app write, do not leave the
    board in a partially flashed state. Re-run the stable low-speed flash command
    until the app write and verification complete.
 
-9. If both `/dev/cu.*` and `/dev/tty.*` return readiness errors after multiple
+11. If both `/dev/cu.*` and `/dev/tty.*` return readiness errors after multiple
    attempts, ask the user to unplug/replug USB or press RESET once, then retry.
 
-10. If failures persist, stop and report branch, commit, target firmware,
+12. If failures persist, stop and report branch, commit, target firmware,
     complete command, serial port list, `lsof` output, and the full esptool or
     PySerial error log to the Env/Serial/Flash thread.
 

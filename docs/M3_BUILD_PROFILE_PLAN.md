@@ -318,10 +318,30 @@ Current verification status:
 - `git diff --check`: passed after the M3 profile and BSP skeleton changes.
 - ONX BSP smoke build with `IDF_COMPONENT_MANAGER=0`: passed, producing
   `examples/onx_bsp_smoke/build/onx_bsp_smoke.bin` size `0x3e060`.
-- Standard full PrintSphere ONX profile build with Component Manager enabled is
-  still blocked in Codex sandbox by `idf_component_manager` using `psutil`
-  `sysctl()` process enumeration. Env/Serial/Flash classified this as
-  environment permission blocking, not source compilation failure.
+- Standard full PrintSphere ONX profile build with Component Manager enabled
+  first failed in the Codex sandbox during CMake configure because
+  `idf_component_manager` used `psutil` process enumeration and hit
+  `PermissionError: [Errno 1] Operation not permitted (originated from
+  sysctl() malloc 1/3)`.
+- A later sandbox-external build attempt was stopped by compilation failure in
+  the managed `espressif__esp_lvgl_adapter` component:
+  `implicit declaration of function 'esp_timer_stop_blocking'` in
+  `esp_lv_adapter.c`. This is a managed LVGL adapter / ESP-IDF 6 compatibility
+  issue, not a Waveshare BSP, CO5300, CST9217, or XPowers dependency failure.
+- That standard build log confirmed the selected profile as
+  `PrintSphere board profile: onx3248g035`.
+- A follow-up standard build-only command was run without a new escalated
+  approval request:
+  `idf.py -DPRINTSPHERE_BOARD=onx3248g035 build`. It reached Ninja
+  compilation using the existing configured build. The compile command for
+  `main/src/ui.cpp` included `-DPRINTSPHERE_BOARD_ONX3248G035=1` and
+  `components/onx3248g035_bsp/include`, confirming the ONX app profile and ONX
+  BSP include path were active.
+- That follow-up build failed on the same managed adapter compatibility issue
+  plus app/UI calls to adapter pause/resume symbols:
+  `esp_timer_stop_blocking` in `esp_lv_adapter.c`, and
+  `esp_lv_adapter_pause` / `esp_lv_adapter_resume` declarations in
+  `main/src/ui.cpp`. It did not fail on the Waveshare `usb` dependency.
 
 Diagnostic note:
 
@@ -338,7 +358,9 @@ Diagnostic note:
   `usb`; with Component Manager disabled it stops at the expected managed
   application dependency `mqtt`.
 - Do not treat the offline diagnostic build as standard full-app acceptance.
-  The standard full build remains the Component Manager enabled command above.
+  The standard full build remains the Component Manager enabled command above,
+  and currently needs the LVGL adapter compatibility issue resolved before it
+  can reach app-level ONX BSP/PMU/UI validation.
 
 ## Required Changes for M3
 
@@ -346,8 +368,12 @@ Must change:
 
 - Implement the real ONX ST7796U panel-handle and LVGL adapter path.
 - Implement the ONX CST826 `esp_lcd_touch_handle_t` and LVGL input-device path.
-- Run a standard full PrintSphere ONX profile build outside the Codex sandbox or
-  with approved permissions so Component Manager can complete.
+- Resolve or patch the `espressif__esp_lvgl_adapter` use of
+  `esp_timer_stop_blocking` under ESP-IDF v6.0.1.
+- Align the app/UI display lifecycle calls with the ONX-compatible LVGL adapter
+  API, including `esp_lv_adapter_pause` and `esp_lv_adapter_resume`.
+- Re-run the standard full PrintSphere ONX profile build after the managed LVGL
+  adapter compatibility issue is resolved.
 
 Can defer:
 

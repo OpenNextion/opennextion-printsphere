@@ -24,10 +24,13 @@ extern "C" {
 
 #define ONX_PIN_I2C_SCL GPIO_NUM_7
 #define ONX_PIN_I2C_SDA GPIO_NUM_8
+#define ONX_PIN_BAT_ADC GPIO_NUM_4
 
 #define ONX_I2C_PORT I2C_NUM_0
 #define ONX_PCF8574_ADDR 0x38
 #define ONX_CST826_ADDR 0x15
+#define ONX_BAT_ADC_UNIT 1
+#define ONX_BAT_ADC_CHANNEL 3
 
 typedef enum {
     ONX_PCF8574_PIN_I2S_CTRL = 1,
@@ -57,6 +60,7 @@ esp_err_t onx_bsp_lcd_fill_bars(void);
 esp_err_t onx_bsp_backlight_init(void);
 esp_err_t onx_bsp_backlight_set(uint8_t brightness_percent);
 uint8_t onx_bsp_backlight_get(void);
+esp_err_t onx_bsp_battery_adc_read_raw(int *raw, int *adc_mv_uncalibrated);
 esp_err_t onx_bsp_touch_init(void);
 esp_err_t onx_bsp_touch_read(onx_touch_point_t *point);
 esp_err_t onx_bsp_smoke_run(void);

@@ -74,10 +74,14 @@ Required constants and commands:
 - `CASET` and `RASET` remain the standard portrait `320 x 480` address window
   without scan-direction offsets.
 
-This is the accepted LCD fix. M3 must not reintroduce mirror, inversion, BGR/RGB,
-or byte-order drift while adding `bsp_display_*`, LVGL, or panel-handle support.
+This is the current validated base LCD configuration for the ONX smoke paths.
+M3 must not reintroduce inversion, BGR/RGB, byte-order drift, CASET/RASET
+offsets, or ad hoc UI compensation while adding `bsp_display_*`, LVGL, or
+panel-handle support. The final PrintSphere LVGL orientation decision remains
+owned by `docs/ONX3248G035_HARDWARE_CONFIG.md` and later visual validation.
 If a future `esp_lcd_panel_handle_t` wrapper or official ST7796U panel component
-is introduced, its init sequence must produce the same final panel state.
+is introduced, its init sequence must preserve the validated base state unless a
+new hardware run records a replacement.
 
 ## Required M3 Compatible APIs
 
@@ -125,7 +129,7 @@ Target behavior:
 
 - `bsp_display_start_with_config()` must create an LVGL display for a
   `320 x 480` ST7796U SPI panel.
-- The display path must preserve the verified LCD config:
+- The display path must preserve the current validated base LCD config:
   - `MADCTL=0x48`.
   - `COLMOD=0x55`.
   - `INVOFF`.
@@ -147,7 +151,8 @@ Implementation note:
   `esp_lcd_panel_t` implementation, or by importing/adapting the official ONX
   ST7796U panel component into the ONX BSP component.
 - This is not a drawing-layer workaround. The panel-handle path must retain the
-  verified ST7796U init configuration.
+  current validated ST7796U base configuration unless a later hardware run
+  records a replacement.
 
 Status:
 
