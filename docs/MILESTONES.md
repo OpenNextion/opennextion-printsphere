@@ -55,15 +55,18 @@ Current status:
 - Branch: `feature/onx-bsp-bringup`.
 - Owner thread: BSP / Hardware, `019e828d-285b-7722-906a-f9baf8047316`.
 - Main-thread acceptance requires evidence from build, flash, and serial logs.
+- Minimal BSP smoke firmware added at `examples/onx_bsp_smoke`.
+- Build and flash passed on 2026-06-02.
+- Serial logs prove I2C, PCF8574, GPIO6 backlight PWM, ST7796 init, LCD color fills, and CST826 chip ID read.
 
 Tasks:
 
-- Build and flash a minimal ONX test firmware.
-- Initialize ST7796 LCD.
-- Fill screen with test colors.
-- Initialize CST826 touch.
+- Build and flash a minimal ONX test firmware. Done with `examples/onx_bsp_smoke`.
+- Initialize ST7796 LCD. Done in BSP smoke logs.
+- Fill screen with test colors. Done in BSP smoke logs.
+- Initialize CST826 touch. Done; chip ID `0x11` read from address `0x15`.
 - Verify four-corner touch coordinates.
-- Verify GPIO6 backlight PWM.
+- Verify GPIO6 backlight PWM. Done in BSP smoke logs for 30% and 100% duty settings.
 
 Exit criteria:
 

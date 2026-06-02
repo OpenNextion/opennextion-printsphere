@@ -1,0 +1,12 @@
+idf_component_register(
+    SRCS
+        "src/onx3248g035_bsp.c"
+    INCLUDE_DIRS
+        "include"
+    REQUIRES
+        esp_driver_gpio
+        esp_driver_i2c
+        esp_driver_ledc
+        esp_driver_spi
+        esp_lcd
+)

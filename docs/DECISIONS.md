@@ -65,3 +65,16 @@ Consequences:
 - The block was resolved on 2026-06-02 by approving `git init` outside the Codex sandbox.
 - `.tools/` and `.DS_Store` are ignored to keep local toolchains and system files out of source control.
 - Baseline commit was created on 2026-06-02 before feature work.
+
+## 2026-06-02 - Separate ONX BSP Smoke Firmware
+
+Decision:
+
+Use a standalone ESP-IDF project at `examples/onx_bsp_smoke` for early ONX hardware bring-up.
+
+Consequences:
+
+- Hardware validation can build and flash without starting the PrintSphere application.
+- The smoke firmware avoids Bambu protocol, MQTT, Web Config, OTA, and UI migration work.
+- The smoke project uses only local ESP-IDF components plus `components/onx3248g035_bsp`, so it can build with `IDF_COMPONENT_MANAGER=0` when the Codex sandbox blocks Component Manager process inspection.
+- The main PrintSphere build and flash flow remains owned by `docs/BUILD_FLASH.md`.
