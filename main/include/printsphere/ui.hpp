@@ -157,9 +157,12 @@ class Ui {
   lv_obj_t* ams_tray_fill_[kMaxAmsUnits][kMaxAmsTrays] = {};   // dark overlay for empty portion
   lv_obj_t* ams_tray_pct_[kMaxAmsUnits][kMaxAmsTrays] = {};    // percentage label inside rect
   lv_obj_t* ams_tray_type_[kMaxAmsUnits][kMaxAmsTrays] = {};
+  lv_obj_t* ams_tray_name_[kMaxAmsUnits][kMaxAmsTrays] = {};
+  lv_obj_t* ams_tray_flag_[kMaxAmsUnits][kMaxAmsTrays] = {};
   lv_obj_t* ams_tray_arrow_[kMaxAmsUnits][kMaxAmsTrays] = {};  // triangle indicator below pill
   lv_obj_t* ams_shelf_[kMaxAmsUnits] = {};                     // gray shelf behind upper pills
   lv_obj_t* ams_base_[kMaxAmsUnits] = {};                      // dark base behind lower pills
+  lv_obj_t* ams_meta_row_[kMaxAmsUnits] = {};
   lv_obj_t* ams_humidity_drop_[kMaxAmsUnits] = {};
   lv_obj_t* ams_humidity_label_[kMaxAmsUnits] = {};
   lv_obj_t* ams_temp_label_[kMaxAmsUnits] = {};
@@ -172,6 +175,7 @@ class Ui {
   lv_obj_t* ams_ext_rect_ = nullptr;
   lv_obj_t* ams_ext_type_ = nullptr;
   lv_obj_t* ams_ext_mat_ = nullptr;
+  lv_obj_t* ams_ext_status_ = nullptr;
   lv_obj_t* ams_ext_arrow_ = nullptr;
   bool ams_ext_spool_shown_ = false;
   // Per-page availability (true if this AMS unit is present on the printer).
