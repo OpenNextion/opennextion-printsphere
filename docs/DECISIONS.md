@@ -78,3 +78,21 @@ Consequences:
 - The smoke firmware avoids Bambu protocol, MQTT, Web Config, OTA, and UI migration work.
 - The smoke project uses only local ESP-IDF components plus `components/onx3248g035_bsp`, so it can build with `IDF_COMPONENT_MANAGER=0` when the Codex sandbox blocks Component Manager process inspection.
 - The main PrintSphere build and flash flow remains owned by `docs/BUILD_FLASH.md`.
+
+## 2026-06-02 - Preserve Application Architecture During ONX UI Port
+
+Decision:
+
+The ONX port keeps PrintSphere's application orchestration, protocol clients,
+status merge, Web Config, and configuration storage stable. Development should
+replace board-specific compatibility and UI layout internals in small slices
+instead of rewriting `Application` or protocol modules.
+
+Consequences:
+
+- `docs/PORTING_ARCHITECTURE_BOUNDARIES.md` is the implementation boundary for
+  UI development threads.
+- UI work starts with board-aware dimensions and page skeletons before replacing
+  detailed page rendering.
+- Printer/cloud protocol, status resolver, Web Config, and config storage
+  changes require main-thread approval and a concrete reason.
