@@ -90,9 +90,13 @@ constexpr int kOnxTopbarHeight = 30;
 constexpr int kOnxBottomHintY = 432;
 constexpr int kOnxBottomHintHeight = 36;
 constexpr uint32_t kOnxColorBg = 0x050607;
+constexpr uint32_t kOnxColorPanel = 0x111418;
+constexpr uint32_t kOnxColorPanel2 = 0x171B20;
 constexpr uint32_t kOnxColorText = 0xF7FAFC;
+constexpr uint32_t kOnxColorSoft = 0xC8D1DC;
 constexpr uint32_t kOnxColorMuted = 0x8B98A8;
 constexpr uint32_t kOnxColorLine = 0x2D333B;
+constexpr uint32_t kOnxColorCyan = 0x87CEEB;
 constexpr char kMdiClock[] = "\xF3\xB1\x91\x8E";
 constexpr char kMdiNozzle[] = "\xF3\xB0\xB9\x9B";
 constexpr char kMdiBed[] = "\xF3\xB1\xA1\x9B";
@@ -520,6 +524,36 @@ void add_onx_page_chrome(lv_obj_t* page,
   lv_obj_set_style_text_color(hint_label, lv_color_hex(kOnxColorMuted), 0);
   lv_obj_set_style_text_align(hint_label, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_align(hint_label, LV_ALIGN_TOP_MID, 0, 0);
+}
+
+lv_obj_t* create_onx_panel(lv_obj_t* parent, int x, int y, int w, int h, uint32_t bg_hex) {
+  lv_obj_t* panel = lv_obj_create(parent);
+  lv_obj_set_pos(panel, x, y);
+  lv_obj_set_size(panel, w, h);
+  lv_obj_set_style_radius(panel, 8, 0);
+  lv_obj_set_style_bg_color(panel, lv_color_hex(bg_hex), 0);
+  lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_color(panel, lv_color_hex(kOnxColorLine), 0);
+  lv_obj_set_style_border_opa(panel, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(panel, 1, 0);
+  lv_obj_set_style_pad_all(panel, 0, 0);
+  lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(panel, LV_OBJ_FLAG_CLICKABLE);
+  enable_touch_bubble(panel);
+  return panel;
+}
+
+lv_obj_t* create_onx_caption(lv_obj_t* parent, const char* text, int x, int y, int w,
+                             const lv_font_t* font) {
+  lv_obj_t* label = lv_label_create(parent);
+  set_label_text_if_changed(label, text);
+  lv_obj_set_pos(label, x, y);
+  lv_obj_set_width(label, w);
+  lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+  lv_obj_set_style_text_font(label, font, 0);
+  lv_obj_set_style_text_color(label, lv_color_hex(kOnxColorMuted), 0);
+  lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, 0);
+  return label;
 }
 
 std::string optional_temperature_text(const char* label, float temperature_c, bool known = false) {
@@ -1456,6 +1490,12 @@ void Ui::apply_page0_parallax(bool force) {
     return;
   }
 
+  if (kOnxUiLayout) {
+    set_hidden(fixed_overlay_, true);
+    set_hidden(status_arc_, true);
+    return;
+  }
+
   int scroll_x = lv_obj_get_scroll_x(pager_);
   if (scroll_x < 0) scroll_x = 0;
 
@@ -1822,6 +1862,10 @@ void Ui::apply_ring_visual_locked(const PrinterSnapshot& snapshot) {
     }
     if (last_ring_indicator_hex_ != ring.indicator_hex) {
       lv_obj_set_style_arc_color(status_arc_, lv_color_hex(ring.indicator_hex), LV_PART_INDICATOR);
+      if (onx_progress_bar_ != nullptr) {
+        lv_obj_set_style_bg_color(onx_progress_bar_, lv_color_hex(ring.indicator_hex),
+                                  LV_PART_INDICATOR);
+      }
       last_ring_indicator_hex_ = ring.indicator_hex;
     }
   }
@@ -1830,6 +1874,9 @@ void Ui::apply_ring_visual_locked(const PrinterSnapshot& snapshot) {
     const lv_color_t text_color = lv_color_hex(text_hex);
     lv_obj_set_style_text_color(progress_label_, text_color, 0);
     lv_obj_set_style_text_color(status_label_, text_color, 0);
+    if (onx_top_status_label_ != nullptr) {
+      lv_obj_set_style_text_color(onx_top_status_label_, text_color, 0);
+    }
     // Camera page mirrors the main-page status line: same font/size and
     // the same lifecycle-driven color (green while printing, red on
     // failure, etc.) instead of a fixed white.
@@ -1907,6 +1954,20 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
   set_label_text_if_changed(progress_label_, progress_buffer);
   const std::string status_text = lifecycle_label(snapshot);
   set_label_text_if_changed(status_label_, status_text);
+  if (onx_progress_bar_ != nullptr) {
+    lv_bar_set_value(onx_progress_bar_, progress, LV_ANIM_OFF);
+  }
+  if (onx_top_status_label_ != nullptr) {
+    char top_status[64] = {};
+    std::snprintf(top_status, sizeof(top_status), "%d%% %s", progress, status_text.c_str());
+    set_label_text_if_changed(onx_top_status_label_, top_status);
+  }
+  if (onx_job_label_ != nullptr) {
+    const std::string job_label =
+        !snapshot.job_name.empty() ? snapshot.job_name :
+        (!snapshot.gcode_file.empty() ? snapshot.gcode_file : "No active job");
+    set_label_text_if_changed(onx_job_label_, job_label);
+  }
 
   const std::string detail = detail_text(snapshot);
 
@@ -1933,6 +1994,13 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
 
   const std::string layer = layer_text(snapshot);
   set_label_text_if_changed(layer_label_, layer);
+  if (onx_metric_detail_label_ != nullptr) {
+    const std::string metric_detail =
+        snapshot.has_error ? "Error" :
+        (!snapshot.stage.empty() ? snapshot.stage :
+         (!detail.empty() ? detail : status_text));
+    set_label_text_if_changed(onx_metric_detail_label_, metric_detail);
+  }
 
   const std::string remaining = show_eta_ ? eta_text(snapshot) : remaining_text(snapshot);
   set_label_text_if_changed(remaining_label_, remaining);
@@ -2745,7 +2813,6 @@ esp_err_t Ui::build_dashboard() {
     add_onx_page_chrome(ams_pages_[u], ams_title, ams_meta, "AMS trays are display-only",
                         dosis20, info20);
   }
-  add_onx_page_chrome(page1_, "Status", "6/8", "", dosis20, info20);
   add_onx_page_chrome(page2_, "Cover", "7/8", "Cover image is display-only", dosis20, info20);
   add_onx_page_chrome(page3_, "Camera", "8/8", "Tap image area to refresh", dosis20, info20);
 
@@ -2973,6 +3040,152 @@ esp_err_t Ui::build_dashboard() {
   lv_obj_align(portal_hint_label_, LV_ALIGN_CENTER, 0, 114);
   lv_obj_add_flag(portal_hint_label_, LV_OBJ_FLAG_HIDDEN);
 
+  if (kOnxUiLayout) {
+    set_hidden(fixed_overlay_, true);
+    set_hidden(status_arc_, true);
+
+    onx_main_topbar_ = lv_obj_create(page1_);
+    lv_obj_set_pos(onx_main_topbar_, kOnxPagePad, kOnxTopbarY);
+    lv_obj_set_size(onx_main_topbar_, kOnxContentWidth, kOnxTopbarHeight);
+    make_transparent(onx_main_topbar_);
+    lv_obj_clear_flag(onx_main_topbar_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(onx_main_topbar_, LV_OBJ_FLAG_CLICKABLE);
+    enable_touch_bubble(onx_main_topbar_);
+
+    onx_top_status_label_ = lv_label_create(onx_main_topbar_);
+    set_label_text_if_changed(onx_top_status_label_, "--% Waiting");
+    lv_obj_set_width(onx_top_status_label_, 202);
+    lv_label_set_long_mode(onx_top_status_label_, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_font(onx_top_status_label_, dosis20, 0);
+    lv_obj_set_style_text_color(onx_top_status_label_, lv_color_hex(kOnxColorText), 0);
+    lv_obj_align(onx_top_status_label_, LV_ALIGN_LEFT_MID, 0, 0);
+
+    lv_obj_set_parent(battery_icon_label_, onx_main_topbar_);
+    lv_obj_set_parent(battery_pct_label_, onx_main_topbar_);
+    lv_obj_set_style_translate_x(battery_icon_label_, 0, 0);
+    lv_obj_set_style_translate_y(battery_icon_label_, 0, 0);
+    lv_obj_set_style_translate_x(battery_pct_label_, 0, 0);
+    lv_obj_set_style_translate_y(battery_pct_label_, 0, 0);
+    lv_obj_set_style_text_font(battery_icon_label_, mdi30, 0);
+    lv_obj_set_style_text_color(battery_icon_label_, lv_color_hex(kOnxColorMuted), 0);
+    lv_obj_align(battery_icon_label_, LV_ALIGN_RIGHT_MID, -48, 0);
+    lv_obj_set_width(battery_pct_label_, 44);
+    lv_obj_set_style_text_align(battery_pct_label_, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_style_text_font(battery_pct_label_, dosis20, 0);
+    lv_obj_set_style_text_color(battery_pct_label_, lv_color_hex(kOnxColorMuted), 0);
+    lv_obj_align(battery_pct_label_, LV_ALIGN_RIGHT_MID, 0, 0);
+
+    lv_obj_set_size(badge_slot_, 60, 60);
+    lv_obj_set_pos(badge_slot_, 12, 57);
+    lv_obj_set_size(logo_badge_, 60, 60);
+    lv_obj_set_style_radius(logo_badge_, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(logo_badge_, lv_color_hex(kOnxColorPanel), 0);
+    lv_obj_set_style_bg_opa(logo_badge_, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(logo_badge_, lv_color_hex(kOnxColorLine), 0);
+    lv_obj_set_style_border_opa(logo_badge_, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(logo_badge_, 1, 0);
+    lv_obj_center(logo_badge_);
+    lv_image_set_scale(logo_image_, 112);
+    lv_obj_center(logo_image_);
+
+    onx_job_label_ = lv_label_create(page1_);
+    set_label_text_if_changed(onx_job_label_, "Waiting for printer data");
+    lv_obj_set_pos(onx_job_label_, 90, 54);
+    lv_obj_set_size(onx_job_label_, 218, 42);
+    lv_label_set_long_mode(onx_job_label_, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_font(onx_job_label_, dosis20, 0);
+    lv_obj_set_style_text_color(onx_job_label_, lv_color_hex(kOnxColorText), 0);
+
+    lv_obj_set_width(detail_label_, 218);
+    lv_obj_set_pos(detail_label_, 90, 96);
+    lv_obj_set_style_text_align(detail_label_, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_style_text_font(detail_label_, info20, 0);
+    lv_obj_set_style_text_color(detail_label_, lv_color_hex(kOnxColorMuted), 0);
+
+    onx_progress_panel_ = create_onx_panel(page1_, 12, 140, 296, 104, kOnxColorPanel);
+    lv_obj_set_parent(progress_label_, onx_progress_panel_);
+    lv_obj_set_style_translate_x(progress_label_, 0, 0);
+    lv_obj_set_style_translate_y(progress_label_, 0, 0);
+    lv_obj_set_pos(progress_label_, 14, 14);
+    lv_obj_set_width(progress_label_, 110);
+    lv_obj_set_style_text_align(progress_label_, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_parent(status_label_, onx_progress_panel_);
+    lv_obj_set_pos(status_label_, 130, 18);
+    lv_obj_set_width(status_label_, 152);
+    lv_obj_set_style_text_align(status_label_, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_style_text_font(status_label_, dosis32, 0);
+    onx_progress_bar_ = lv_bar_create(onx_progress_panel_);
+    lv_obj_set_pos(onx_progress_bar_, 12, 74);
+    lv_obj_set_size(onx_progress_bar_, 272, 12);
+    lv_bar_set_range(onx_progress_bar_, 0, 100);
+    lv_bar_set_value(onx_progress_bar_, 0, LV_ANIM_OFF);
+    lv_obj_set_style_radius(onx_progress_bar_, 6, LV_PART_MAIN);
+    lv_obj_set_style_radius(onx_progress_bar_, 6, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(onx_progress_bar_, lv_color_hex(0x20252B), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(onx_progress_bar_, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(onx_progress_bar_, lv_color_hex(arc_colors_.printing), LV_PART_INDICATOR);
+
+    onx_nozzle_card_ = create_onx_panel(page1_, 12, 258, 143, 66, kOnxColorPanel2);
+    onx_bed_card_ = create_onx_panel(page1_, 165, 258, 143, 66, kOnxColorPanel2);
+    onx_layer_card_ = create_onx_panel(page1_, 12, 334, 143, 66, kOnxColorPanel2);
+    onx_detail_card_ = create_onx_panel(page1_, 165, 334, 143, 66, kOnxColorPanel2);
+    create_onx_caption(onx_nozzle_card_, "Nozzle", 10, 8, 123, info20);
+    create_onx_caption(onx_bed_card_, "Bed", 10, 8, 123, info20);
+    create_onx_caption(onx_layer_card_, "Layer", 10, 8, 123, info20);
+    create_onx_caption(onx_detail_card_, "Detail", 10, 8, 123, info20);
+
+    lv_obj_set_parent(nozzle_value_label_, onx_nozzle_card_);
+    lv_obj_set_pos(nozzle_value_label_, 10, 30);
+    lv_obj_set_width(nozzle_value_label_, 123);
+    lv_obj_set_style_text_align(nozzle_value_label_, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_parent(nozzle_aux_label_, onx_nozzle_card_);
+    lv_obj_set_pos(nozzle_aux_label_, 74, 11);
+    lv_obj_set_width(nozzle_aux_label_, 58);
+    lv_obj_set_style_text_align(nozzle_aux_label_, LV_TEXT_ALIGN_RIGHT, 0);
+    set_hidden(nozzle_prefix_label_, true);
+
+    lv_obj_set_parent(bed_value_label_, onx_bed_card_);
+    lv_obj_set_pos(bed_value_label_, 10, 30);
+    lv_obj_set_width(bed_value_label_, 123);
+    lv_obj_set_style_text_align(bed_value_label_, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_parent(bed_aux_label_, onx_bed_card_);
+    lv_obj_set_pos(bed_aux_label_, 46, 11);
+    lv_obj_set_width(bed_aux_label_, 88);
+    lv_obj_set_style_text_align(bed_aux_label_, LV_TEXT_ALIGN_RIGHT, 0);
+    set_hidden(bed_prefix_label_, true);
+
+    lv_obj_set_parent(layer_label_, onx_layer_card_);
+    lv_obj_set_pos(layer_label_, 10, 30);
+    lv_obj_set_width(layer_label_, 123);
+    lv_obj_set_style_text_font(layer_label_, dosis20, 0);
+    lv_obj_set_style_text_align(layer_label_, LV_TEXT_ALIGN_LEFT, 0);
+
+    onx_metric_detail_label_ = lv_label_create(onx_detail_card_);
+    set_label_text_if_changed(onx_metric_detail_label_, "Waiting");
+    lv_obj_set_pos(onx_metric_detail_label_, 10, 30);
+    lv_obj_set_width(onx_metric_detail_label_, 123);
+    lv_label_set_long_mode(onx_metric_detail_label_, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_font(onx_metric_detail_label_, dosis20, 0);
+    lv_obj_set_style_text_color(onx_metric_detail_label_, lv_color_hex(kOnxColorSoft), 0);
+
+    lv_obj_set_size(remaining_row_, 296, 48);
+    lv_obj_set_pos(remaining_row_, 12, 412);
+    lv_obj_set_style_bg_color(remaining_row_, lv_color_hex(kOnxColorPanel), 0);
+    lv_obj_set_style_bg_opa(remaining_row_, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(remaining_row_, lv_color_hex(kOnxColorLine), 0);
+    lv_obj_set_style_border_opa(remaining_row_, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(remaining_row_, 1, 0);
+    lv_obj_set_style_radius(remaining_row_, 8, 0);
+    lv_obj_set_style_pad_all(remaining_row_, 0, 0);
+    lv_obj_set_style_pad_column(remaining_row_, 8, 0);
+    lv_obj_set_style_text_color(remaining_label_, lv_color_hex(kOnxColorCyan), 0);
+
+    lv_obj_set_width(portal_hint_label_, 296);
+    lv_obj_set_pos(portal_hint_label_, 12, 462);
+    lv_obj_set_style_text_align(portal_hint_label_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_color(portal_hint_label_, lv_color_hex(kOnxColorMuted), 0);
+  }
+
   brightness_overlay_ = lv_label_create(lv_layer_top());
   set_label_text_if_changed(brightness_overlay_, "80%");
   lv_obj_set_style_text_font(brightness_overlay_, dosis40, 0);
@@ -3144,6 +3357,24 @@ void Ui::apply_page_visibility() {
   set_hidden(portal_hint_label_, !show_portal_hint);
   set_hidden(page2_image_, !on_page2 || !preview_image_visible_);
   set_hidden(page3_image_, !on_page3 || !camera_image_visible_);
+
+  if (kOnxUiLayout) {
+    set_hidden(fixed_overlay_, true);
+    set_hidden(status_arc_, true);
+    set_hidden(progress_label_, !on_page1);
+    set_hidden(onx_main_topbar_, !on_page1);
+    set_hidden(onx_top_status_label_, !on_page1);
+    set_hidden(onx_job_label_, !on_page1);
+    set_hidden(onx_progress_panel_, !on_page1);
+    set_hidden(onx_progress_bar_, !on_page1);
+    set_hidden(onx_nozzle_card_, !on_page1);
+    set_hidden(onx_bed_card_, !on_page1);
+    set_hidden(onx_layer_card_, !on_page1);
+    set_hidden(onx_detail_card_, !on_page1);
+    set_hidden(onx_metric_detail_label_, !on_page1);
+    set_hidden(nozzle_prefix_label_, true);
+    set_hidden(bed_prefix_label_, true);
+  }
 
   // Overlay + page0 opacity are driven by apply_page0_parallax.
   // When not scrolling, snap to final state.

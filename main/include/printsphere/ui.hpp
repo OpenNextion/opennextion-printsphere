@@ -183,6 +183,16 @@ class Ui {
   lv_obj_t* page1_ = nullptr;
   lv_obj_t* page2_ = nullptr;
   lv_obj_t* page3_ = nullptr;
+  lv_obj_t* onx_main_topbar_ = nullptr;
+  lv_obj_t* onx_top_status_label_ = nullptr;
+  lv_obj_t* onx_job_label_ = nullptr;
+  lv_obj_t* onx_progress_panel_ = nullptr;
+  lv_obj_t* onx_progress_bar_ = nullptr;
+  lv_obj_t* onx_nozzle_card_ = nullptr;
+  lv_obj_t* onx_bed_card_ = nullptr;
+  lv_obj_t* onx_layer_card_ = nullptr;
+  lv_obj_t* onx_detail_card_ = nullptr;
+  lv_obj_t* onx_metric_detail_label_ = nullptr;
   lv_obj_t* status_arc_ = nullptr;
   lv_obj_t* progress_label_ = nullptr;
   lv_obj_t* battery_icon_label_ = nullptr;
