@@ -21,6 +21,13 @@ Rules:
 
 ## BSP / Hardware Thread
 
+Current assignment:
+
+- Thread id: `019e828d-285b-7722-906a-f9baf8047316`.
+- Active branch: `feature/onx-bsp-bringup`.
+- Status: implementation worker for M2 ONX board bring-up.
+- Deliverable: a minimal ONX hardware smoke firmware and BSP layer proving LCD, touch, and backlight basics before PrintSphere app integration.
+
 Scope:
 
 - ONX3248G035 ST7796 display.
@@ -35,6 +42,9 @@ Boundaries:
 - Should keep changes inside board component and board config where possible.
 - Should not modify Bambu protocol logic.
 - Should not redesign UI layout beyond what is needed for hardware testing.
+- Must follow `docs/DEV_ENV.md` and `docs/BUILD_FLASH.md`.
+- Must not change ESP-IDF version, serial port, flash parameters, or build flow without main-thread approval.
+- Must state the exact firmware path and purpose before flashing.
 
 ## UI / Layout Thread
 
@@ -101,3 +111,10 @@ Boundaries:
 ## Coordination Rule
 
 When subthreads finish, the main thread must explicitly read their outputs and summarize them. Subthread completion does not automatically notify the main thread.
+
+## Active Work
+
+- 2026-06-02: M2 ONX board bring-up started on `feature/onx-bsp-bringup`.
+- Main thread owns Git integration and acceptance.
+- BSP/Hardware thread owns implementation.
+- Env/Serial/Flash thread owns build/flash base issues if the standard flow breaks.

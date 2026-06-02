@@ -49,6 +49,13 @@ Exit criteria:
 
 Goal: Validate the hardware before integrating PrintSphere.
 
+Current status:
+
+- Started on 2026-06-02.
+- Branch: `feature/onx-bsp-bringup`.
+- Owner thread: BSP / Hardware, `019e828d-285b-7722-906a-f9baf8047316`.
+- Main-thread acceptance requires evidence from build, flash, and serial logs.
+
 Tasks:
 
 - Build and flash a minimal ONX test firmware.
