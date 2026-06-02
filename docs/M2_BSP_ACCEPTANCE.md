@@ -23,7 +23,7 @@ Already accepted by build and serial evidence:
 Remaining manual checks:
 
 - Visual LCD color and orientation check.
-- Four-corner touch coordinate check.
+- Four-corner touch coordinate check. Completed on 2026-06-02.
 
 ## Setup
 
@@ -147,3 +147,57 @@ Mapping inference:
 Decision:
 - pass / needs BSP correction / needs manual retest
 ```
+
+## Acceptance Record - 2026-06-02 Touch Capture
+
+Branch: `feature/onx-bsp-bringup`
+
+Commits:
+
+- `209e836 Add ONX BSP smoke bring-up`
+- `322a419 Document M2 BSP acceptance procedure`
+
+Firmware: `examples/onx_bsp_smoke`
+
+Serial port: `/dev/cu.wchusbserial10`
+
+Serial capture result:
+
+- Boot evidence lines: 8.
+- Touch lines: 65.
+- No panic, reboot, or watchdog observed during the capture window.
+
+Representative touch taps:
+
+```text
+Top-left:     points=1 x=56  y=28
+Top-right:    points=1 x=283 y=53
+Bottom-right: points=1 x=274 y=439
+Bottom-left:  points=1 x=39  y=458
+Center:       points=1 x=172 y=223
+```
+
+Second repeated sequence:
+
+```text
+Top-left:     points=1 x=42  y=39
+Top-right:    points=1 x=254 y=56
+Bottom-right: points=1 x=290 y=435
+Bottom-left:  points=1 x=48  y=453
+Center:       points=1 x=188 y=257
+```
+
+Mapping inference:
+
+- `swap_xy`: no.
+- `mirror_x`: no.
+- `mirror_y`: no.
+- Observed x range: roughly `23..290`.
+- Observed y range: roughly `28..458`.
+- The touch coordinate orientation matches a portrait panel with x increasing
+  left-to-right and y increasing top-to-bottom.
+
+Decision:
+
+- Touch coordinate check: pass.
+- Visual LCD color and orientation check: still needs user confirmation.
