@@ -1,5 +1,33 @@
 #include "printsphere/pmu.hpp"
 
+#if defined(PRINTSPHERE_BOARD_ONX3248G035) && PRINTSPHERE_BOARD_ONX3248G035
+
+#include "esp_log.h"
+
+namespace printsphere {
+
+namespace {
+constexpr char kTag[] = "printsphere.pmu";
+}  // namespace
+
+esp_err_t PmuManager::initialize() {
+  if (initialized_) {
+    return ESP_OK;
+  }
+
+  initialized_ = true;
+  ESP_LOGW(kTag, "ONX profile has no AXP2101 PMU; power snapshot unavailable");
+  return ESP_OK;
+}
+
+PowerSnapshot PmuManager::sample() const {
+  return PowerSnapshot{};
+}
+
+}  // namespace printsphere
+
+#else
+
 #define XPOWERS_CHIP_AXP2101
 #include "XPowersLib.h"
 
@@ -115,3 +143,5 @@ PowerSnapshot PmuManager::sample() const {
 }
 
 }  // namespace printsphere
+
+#endif

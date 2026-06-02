@@ -1,3 +1,23 @@
+idf_build_get_property(PRINTSPHERE_BOARD PRINTSPHERE_BOARD)
+
+set(PRINTSPHERE_BOARD_REQUIRES)
+set(PRINTSPHERE_BOARD_DEFINES)
+
+if(PRINTSPHERE_BOARD STREQUAL "waveshare_amoled_1_75")
+    list(APPEND PRINTSPHERE_BOARD_REQUIRES
+        XPowersLib
+        esp32_s3_touch_amoled_1_75
+    )
+    list(APPEND PRINTSPHERE_BOARD_DEFINES PRINTSPHERE_BOARD_WAVESHARE_AMOLED_1_75=1)
+elseif(PRINTSPHERE_BOARD STREQUAL "onx3248g035")
+    list(APPEND PRINTSPHERE_BOARD_REQUIRES onx3248g035_bsp)
+    list(APPEND PRINTSPHERE_BOARD_DEFINES PRINTSPHERE_BOARD_ONX3248G035=1)
+else()
+    message(FATAL_ERROR "Unsupported PRINTSPHERE_BOARD=${PRINTSPHERE_BOARD}")
+endif()
+
+message(STATUS "PrintSphere board profile: ${PRINTSPHERE_BOARD}")
+
 idf_component_register(
     SRCS
         "app_main.cpp"
@@ -30,10 +50,9 @@ idf_component_register(
         "include/certs/bambu_h2c_251122.cert"
         "include/error_lookup/error_lookup.tsv"
     REQUIRES
-        XPowersLib
+        ${PRINTSPHERE_BOARD_REQUIRES}
         app_update
         esp_https_ota
-        esp32_s3_touch_amoled_1_75
         esp_driver_gpio
         esp_event
         esp_http_client
@@ -51,6 +70,7 @@ idf_component_register(
 
 target_compile_definitions(${COMPONENT_LIB} PRIVATE
     PRINTSPHERE_RELEASE_VERSION="${PRINTSPHERE_RELEASE_VERSION}"
+    ${PRINTSPHERE_BOARD_DEFINES}
 )
 string(FIND "${PRINTSPHERE_RELEASE_VERSION}" "-debug" _debug_pos)
 string(FIND "${PRINTSPHERE_RELEASE_VERSION}" "_debug" _debug_pos2)

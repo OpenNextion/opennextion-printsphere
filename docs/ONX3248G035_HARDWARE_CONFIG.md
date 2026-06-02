@@ -96,6 +96,23 @@ Why this resolves the visual defects:
   point, so color constants stay standard and byte order does not drift across
   drawing helpers.
 
+## Defect-to-Configuration Map
+
+The M2 failures were caused by final ST7796U controller state, not by the smoke
+page renderer.
+
+| Observed defect | Root configuration point | Final fix |
+| --- | --- | --- |
+| Text and direction labels horizontally mirrored | `MADCTL.MX` was not represented in the direct-GRAM smoke path | Set `ONX_LCD_MADCTL_VALUE` to include `LCD_CMD_MX_BIT` |
+| Red/blue channel mismatch or color labels not matching visible colors | `MADCTL.BGR` must match the ONX panel element order | Set `ONX_LCD_MADCTL_VALUE` to include `LCD_CMD_BGR_BIT` |
+| White and black inverted | Panel inversion state was left enabled | Send final `LCD_CMD_INVOFF` through `ONX_LCD_INVERT_CMD` |
+| RGB565 words producing wrong colors over SPI | SPI color payload byte order differs from logical `uint16_t` color constants | Use `lcd_pack_rgb565()` before every `tx_color` payload |
+| Direction issue tempting coordinate offsets | Address window should express logical portrait coordinates only | Keep `CASET`/`RASET` as `x_start..x_end-1`, `y_start..y_end-1` with no offsets |
+
+The accepted final `MADCTL` value is `0x48`: `MX` (`0x40`) plus `BGR`
+(`0x08`). `MY` and `MV` remain clear, so the controller stays in portrait
+`320 x 480`; the fix does not swap axes or apply a vertical mirror.
+
 ## RGB565 Bus Byte Order
 
 Logical colors remain standard RGB565 values:
@@ -158,6 +175,26 @@ Reference sources:
   repository.
 - `Example Programs/ESP-IDF/09_outofbox_demo/components/board/lcd_st7796u.c`
   in the same repository.
+- `Example Programs/ESP-IDF/09_outofbox_demo/components/board/board_lcd.c`
+  and `touch_cst826.c` in the same repository.
+
+Official source observations:
+
+- The official board LCD config uses SPI mode 0, 8-bit commands and parameters,
+  an 80 MHz pixel clock, `LCD_RGB_ELEMENT_ORDER_BGR`, and 16 bits per pixel.
+- The official ST7796U component maps BGR element order to `LCD_CMD_BGR_BIT`
+  and 16 bits per pixel to `COLMOD=0x55`.
+- The official ST7796U component's draw path uses standard `CASET`, `RASET`,
+  and `RAMWR` windows with `x_end - 1` and `y_end - 1`; offsets are only panel
+  gaps, not a mirror workaround.
+- The official ST7796U component exposes mirror and swap operations by rewriting
+  `MADCTL.MX`, `MADCTL.MY`, and `MADCTL.MV`.
+- The official board initialization calls `esp_lcd_panel_invert_color(...,
+  false)`, producing a final `INVOFF` state.
+- The official LVGL port sets display `mirror_x=1` while keeping `swap_xy=0`
+  and `mirror_y=0`.
+- The official CST826 touch config uses `x_max=320`, `y_max=480`,
+  `swap_xy=0`, `mirror_x=0`, and `mirror_y=0`.
 
 Matches:
 
@@ -183,6 +220,8 @@ Rejected approaches:
 - Swapping color constants such as using `0x001F` for red.
 - Adding CASET/RASET offsets to compensate for scan direction.
 - Re-enabling `INVON` and compensating in drawing code.
+- Applying LVGL-only rotation flags in a future panel adapter without preserving
+  the same final ST7796U register state.
 
 ## Visual Acceptance
 

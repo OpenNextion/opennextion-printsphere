@@ -52,15 +52,8 @@ Reasoning:
 
 ## Minimum CMake Path
 
-The current `main/CMakeLists.txt` hard-requires both board and PMU dependencies:
-
-```cmake
-REQUIRES
-    XPowersLib
-    esp32_s3_touch_amoled_1_75
-```
-
-For M3, this should become profile-gated. The smallest safe shape is:
+The root `CMakeLists.txt` owns the project-level board cache option and limits
+which local board components ESP-IDF may include:
 
 ```cmake
 set(PRINTSPHERE_BOARD "waveshare_amoled_1_75" CACHE STRING "PrintSphere board profile")
@@ -68,6 +61,34 @@ set_property(CACHE PRINTSPHERE_BOARD PROPERTY STRINGS
     waveshare_amoled_1_75
     onx3248g035
 )
+
+if(PRINTSPHERE_BOARD STREQUAL "waveshare_amoled_1_75")
+    set(COMPONENTS main XPowersLib esp32_s3_touch_amoled_1_75)
+elseif(PRINTSPHERE_BOARD STREQUAL "onx3248g035")
+    set(COMPONENTS main onx3248g035_bsp)
+else()
+    message(FATAL_ERROR "Unsupported PRINTSPHERE_BOARD=${PRINTSPHERE_BOARD}")
+endif()
+```
+
+This is required because ESP-IDF can inspect local project components before
+`main` dependencies are fully expanded. The ONX profile must not let the
+Waveshare BSP manifest participate in dependency resolution.
+
+After including ESP-IDF's project helpers, the root CMake passes the selected
+board into IDF build properties:
+
+```cmake
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+idf_build_set_property(PRINTSPHERE_BOARD "${PRINTSPHERE_BOARD}")
+project(printsphere_idf)
+```
+
+The `main/CMakeLists.txt` then maps the selected profile to the app component's
+direct board dependency and compile define after reading that build property:
+
+```cmake
+idf_build_get_property(PRINTSPHERE_BOARD PRINTSPHERE_BOARD)
 
 set(PRINTSPHERE_BOARD_REQUIRES)
 set(PRINTSPHERE_BOARD_DEFINES)
@@ -89,9 +110,13 @@ endif()
 Then use `${PRINTSPHERE_BOARD_REQUIRES}` in `idf_component_register(REQUIRES ...)`
 and apply `${PRINTSPHERE_BOARD_DEFINES}` with `target_compile_definitions`.
 
-Important: this CMake skeleton alone is not enough to build ONX if
-`src/pmu.cpp` still includes `XPowersLib.h` unconditionally. The App/BSP boundary
-must make ONX power reporting compile without `XPowersLib`.
+Current implementation status:
+
+- Default profile remains `waveshare_amoled_1_75` and includes
+  `XPowersLib` plus `esp32_s3_touch_amoled_1_75`.
+- ONX profile includes only `onx3248g035_bsp` from local board components.
+- `PRINTSPHERE_BOARD_ONX3248G035=1` gates the temporary no-PMU path in
+  `main/src/pmu.cpp`, so ONX no longer includes or probes XPowersLib/AXP2101.
 
 ## Avoiding CO5300/CST9217/AXP2101 on ONX
 
@@ -103,14 +128,16 @@ ONX profile must avoid these dependency sources:
   a compatibility alias.
 - Do not include headers from `components/esp32_s3_touch_amoled_1_75/include`.
 
-ONX compile blockers expected until BSP/App compatibility work lands:
+ONX compile blockers expected until the LVGL display/touch adapter lands:
 
-- `main/src/ui.cpp` currently calls Waveshare-style APIs such as
-  `bsp_display_lock`, `bsp_display_unlock`, `bsp_display_start_with_config`,
-  `bsp_display_rotation_set`, and `bsp_display_brightness_set`.
-- `main/src/application.cpp` reads `BSP_LCD_TOUCH_INT`.
-- `main/src/pmu.cpp` unconditionally defines `XPOWERS_CHIP_AXP2101` and uses
-  `XPowersPMU`, `AXP2101_SLAVE_ADDRESS`, and AXP2101 charger configuration.
+- `bsp_display_start_with_config()` currently returns `NULL` for ONX because
+  the real ST7796U `esp_lcd_panel_handle_t` plus LVGL adapter path is not
+  implemented yet.
+- `bsp_touch_new()` initializes the raw CST826 path but does not yet create an
+  `esp_lcd_touch_handle_t` or LVGL input device.
+- Direct raw touch IRQ polling is now guarded for `BSP_LCD_TOUCH_INT=GPIO_NUM_NC`.
+- PMU compile/runtime fallback is present for ONX and is no longer a build
+  blocker.
 
 Required cross-thread input:
 
@@ -286,30 +313,41 @@ Expected early failures before compatibility work:
 
 ## Build Attempts in This Review
 
-No build was executed in this review.
+Current verification status:
 
-Reason:
+- `git diff --check`: passed after the M3 profile and BSP skeleton changes.
+- ONX BSP smoke build with `IDF_COMPONENT_MANAGER=0`: passed, producing
+  `examples/onx_bsp_smoke/build/onx_bsp_smoke.bin` size `0x3e060`.
+- Standard full PrintSphere ONX profile build with Component Manager enabled is
+  still blocked in Codex sandbox by `idf_component_manager` using `psutil`
+  `sysctl()` process enumeration. Env/Serial/Flash classified this as
+  environment permission blocking, not source compilation failure.
 
-- The task asked for build/profile strategy and allowed only documentation or a
-  very small CMake/profile skeleton.
-- The working tree already contains uncommitted BSP-thread edits in
-  `components/onx3248g035_bsp`. Running a build now would classify someone
-  else's in-progress BSP state rather than the committed M2 baseline.
-- The standard build commands and expected classifications are recorded above
-  for the next coordinated build attempt.
+Diagnostic note:
+
+- A non-acceptance offline diagnostic build with `IDF_COMPONENT_MANAGER=0`
+  showed that defining `PRINTSPHERE_BOARD` only inside `main/CMakeLists.txt`
+  was insufficient: CMake still selected `waveshare_amoled_1_75` and attempted
+  to resolve the Waveshare `usb` dependency.
+- The fix is the current top-level `PRINTSPHERE_BOARD` cache definition plus
+  profile-specific `COMPONENTS` allowlist before `project()`, then passing the
+  selection through `idf_build_set_property()` for component requirement
+  evaluation.
+- After the fix, the same offline diagnostic prints
+  `PrintSphere board profile: onx3248g035`. It no longer fails on Waveshare
+  `usb`; with Component Manager disabled it stops at the expected managed
+  application dependency `mqtt`.
+- Do not treat the offline diagnostic build as standard full-app acceptance.
+  The standard full build remains the Component Manager enabled command above.
 
 ## Required Changes for M3
 
 Must change:
 
-- Add profile-gated board dependencies in `main/CMakeLists.txt`.
-- Ensure ONX profile requires `onx3248g035_bsp`, not
-  `esp32_s3_touch_amoled_1_75`.
-- Remove `XPowersLib` from ONX profile dependency closure.
-- Provide an ONX-compatible display/touch/brightness/lock API or a neutral board
-  API that lets `ui.cpp` compile without the Waveshare BSP.
-- Provide an ONX-compatible power path that lets the app compile without
-  `XPowersLib` and AXP2101 symbols.
+- Implement the real ONX ST7796U panel-handle and LVGL adapter path.
+- Implement the ONX CST826 `esp_lcd_touch_handle_t` and LVGL input-device path.
+- Run a standard full PrintSphere ONX profile build outside the Codex sandbox or
+  with approved permissions so Component Manager can complete.
 
 Can defer:
 

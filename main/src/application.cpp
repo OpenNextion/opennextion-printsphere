@@ -54,6 +54,18 @@ bool tick_deadline_active(TickType_t deadline, TickType_t now) {
   return deadline != 0 && static_cast<int32_t>(deadline - now) > 0;
 }
 
+bool raw_touch_irq_asserted() {
+#if defined(BSP_LCD_TOUCH_INT)
+  constexpr gpio_num_t kRawTouchIrqGpio = BSP_LCD_TOUCH_INT;
+#else
+  constexpr gpio_num_t kRawTouchIrqGpio = GPIO_NUM_NC;
+#endif
+  if (kRawTouchIrqGpio == GPIO_NUM_NC) {
+    return false;
+  }
+  return gpio_get_level(kRawTouchIrqGpio) == 0;
+}
+
 PrinterModel preferred_model_for_routing(const PrinterSnapshot& local_snapshot,
                                          const BambuCloudSnapshot& cloud_snapshot) {
   if (cloud_snapshot.model != PrinterModel::kUnknown) {
@@ -141,7 +153,7 @@ void wait_for_next_iteration(Ui& ui, TickType_t delay) {
     if (ui.has_chamber_light_toggle_request()) {
       break;
     }
-    if (touch_wake_poll_active && gpio_get_level(BSP_LCD_TOUCH_INT) == 0) {
+    if (touch_wake_poll_active && raw_touch_irq_asserted()) {
       // The LVGL worker is paused while the screen is off, so a short tap can
       // be missed if the main loop sleeps for the full low-power interval.
       // Poll the raw touch IRQ in short slices so wake feels immediate.

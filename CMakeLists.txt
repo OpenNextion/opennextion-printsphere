@@ -6,7 +6,30 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(PRINTSPHERE_RELEASE_VERSION "v1.6-beta1")
 set(PROJECT_VER "${PRINTSPHERE_RELEASE_VERSION}")
+
+set(PRINTSPHERE_BOARD "waveshare_amoled_1_75" CACHE STRING "PrintSphere board profile")
+set_property(CACHE PRINTSPHERE_BOARD PROPERTY STRINGS
+    waveshare_amoled_1_75
+    onx3248g035
+)
+
+if(PRINTSPHERE_BOARD STREQUAL "waveshare_amoled_1_75")
+    set(COMPONENTS
+        main
+        XPowersLib
+        esp32_s3_touch_amoled_1_75
+    )
+elseif(PRINTSPHERE_BOARD STREQUAL "onx3248g035")
+    set(COMPONENTS
+        main
+        onx3248g035_bsp
+    )
+else()
+    message(FATAL_ERROR "Unsupported PRINTSPHERE_BOARD=${PRINTSPHERE_BOARD}")
+endif()
+
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+idf_build_set_property(PRINTSPHERE_BOARD "${PRINTSPHERE_BOARD}")
 project(printsphere_idf)
 
 # Work around an Xtensa GCC ICE seen in ESP-IDF 5.5.2 while compiling

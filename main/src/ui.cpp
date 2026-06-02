@@ -158,6 +158,18 @@ class LvglLockGuard {
 
 uint32_t LvglLockGuard::lock_fail_count_ = 0;
 
+bool raw_touch_irq_asserted() {
+#if defined(BSP_LCD_TOUCH_INT)
+  constexpr gpio_num_t kRawTouchIrqGpio = BSP_LCD_TOUCH_INT;
+#else
+  constexpr gpio_num_t kRawTouchIrqGpio = GPIO_NUM_NC;
+#endif
+  if (kRawTouchIrqGpio == GPIO_NUM_NC) {
+    return false;
+  }
+  return gpio_get_level(kRawTouchIrqGpio) == 0;
+}
+
 const char* ram_region(const void* ptr) {
   if (ptr == nullptr) {
     return "null";
@@ -3520,8 +3532,7 @@ void Ui::update_power_save(bool on_battery, bool print_active) {
   // While the LVGL worker is paused (screen off), LVGL touch events are not
   // processed.  Poll the raw touch-interrupt GPIO so a finger press can still
   // wake the display.  CST9217 pulls INT (GPIO 11) low on contact.
-  if (screen_power_mode_ == ScreenPowerMode::kOff &&
-      gpio_get_level(BSP_LCD_TOUCH_INT) == 0) {
+  if (screen_power_mode_ == ScreenPowerMode::kOff && raw_touch_irq_asserted()) {
     note_activity(true);  // updates last_activity_tick_ms_ + calls wake_display()
     return;               // re-evaluate on next call with fresh idle_ms
   }

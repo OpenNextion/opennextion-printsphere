@@ -55,9 +55,10 @@ PrintSphere-compatible adapter:
 - `onx_bsp_lcd_get_io_handle()`: returns the initialized LCD SPI IO handle.
 - `onx_bsp_backlight_get()`: returns the last requested LEDC brightness percent.
 
-These are intentionally ONX-named primitives. They do not replace the public
-`bsp_*` API yet, so they do not collide with the existing Waveshare BSP while
-Build/Release decides the board-selection mechanism.
+These are intentionally ONX-named primitives used by the temporary ONX
+`bsp_*` compatibility layer. Build/Release must select exactly one local board
+component for a firmware so the ONX and Waveshare implementations of the same
+public `bsp_*` symbols are never linked together.
 
 ## LCD Configuration Constraint
 
@@ -92,6 +93,12 @@ Target behavior:
 Status:
 
 - ONX I2C init and handle access are ready.
+- The compatibility layer now exports `bsp_i2c_init()` and
+  `bsp_i2c_get_handle()` from
+  `components/onx3248g035_bsp/src/onx3248g035_bsp_compat.c`.
+- `bsp_i2c_deinit()` returns `ESP_ERR_NOT_SUPPORTED` because the ONX bring-up
+  path keeps the shared board I2C bus alive for PCF8574, CST826, and future
+  board controls.
 
 ### Brightness and Backlight
 
@@ -107,6 +114,10 @@ Target behavior:
 Status:
 
 - ONX GPIO6 LEDC PWM is verified and has the required state getter.
+- The compatibility layer maps `bsp_display_brightness_init()`,
+  `bsp_display_brightness_set()`, `bsp_display_brightness_get()`,
+  `bsp_display_backlight_on()`, and `bsp_display_backlight_off()` to the
+  verified ONX backlight API.
 
 ### Display Init and LVGL Adapter
 
@@ -140,8 +151,21 @@ Implementation note:
 
 Status:
 
-- Deferred to Build/Release plus BSP for the M3 minimal app firmware because it
-  changes the app component dependency from the Waveshare BSP to ONX.
+- A temporary compatibility header is present at
+  `components/onx3248g035_bsp/include/bsp/esp32_s3_touch_amoled_1_75.h`.
+  Build/Release must ensure that only one BSP component providing this include
+  path and the `bsp_*` symbols is selected for a firmware.
+- `BSP_LCD_H_RES=320`, `BSP_LCD_V_RES=480`, `BSP_LCD_TOUCH_INT=GPIO_NUM_NC`,
+  and ONX pin aliases are exported for the ONX profile.
+- `bsp_display_new()` initializes the verified low-level ONX LCD path and can
+  return the `esp_lcd_panel_io_handle_t`, but it deliberately returns
+  `ESP_ERR_NOT_SUPPORTED` because there is no ONX `esp_lcd_panel_handle_t` yet.
+- `bsp_display_start()` and `bsp_display_start_with_config()` deliberately
+  return `NULL` after logging the missing LVGL adapter path. This is a blocker,
+  not a fake display success.
+- `bsp_display_rotation_set()` accepts only `BSP_DISPLAY_ROTATE_0` for the
+  accepted portrait orientation. Other rotations return `ESP_ERR_NOT_SUPPORTED`
+  until ST7796U and touch transforms are retested.
 
 ### Touch
 
@@ -160,7 +184,10 @@ Target behavior:
 Status:
 
 - Raw CST826 polling is verified.
-- `esp_lcd_touch` handle creation is not yet implemented in ONX BSP.
+- `bsp_touch_new()` initializes the verified raw CST826 path, clears the output
+  handle, and returns `ESP_ERR_NOT_SUPPORTED`.
+- `esp_lcd_touch` handle creation and LVGL input-device registration remain
+  M3 blockers.
 
 ### PMU and Power
 
@@ -178,7 +205,13 @@ Replacement boundary:
 
 Status:
 
-- Deferred. Do not probe AXP2101 on ONX during M3.
+- App/Profile fallback is in place for `PRINTSPHERE_BOARD_ONX3248G035`: PMU
+  initialization does not include or probe XPowersLib/AXP2101, returns `ESP_OK`,
+  and reports power as unavailable through the default `PowerSnapshot`.
+- This is a demo-first temporary strategy for M3 boot only. Battery ADC,
+  calibration, USB/charge status, and PCF8574 `CHG_N` semantics remain separate
+  bring-up work.
+- Do not probe AXP2101 on ONX during M3.
 
 ### SD Card
 
@@ -190,6 +223,9 @@ Status:
 - Deferred for M3 unless the app requires local storage beyond NVS and embedded
   assets.
 - If needed later, implement as a separate ONX SD bring-up task.
+- The compatibility layer exports `bsp_sdcard_mount()` and
+  `bsp_sdcard_unmount()` shape only. Mount returns `ESP_ERR_NOT_SUPPORTED`;
+  unmount is a no-op.
 
 ### Audio, Camera, IO Expander Compatibility
 
@@ -205,13 +241,15 @@ Status:
 Do not compile both the Waveshare BSP implementation and an ONX implementation
 of the same `bsp_*` symbols into one firmware.
 
-Recommended Build/Release work:
+Build/Release status:
 
-1. Add a board selection option such as `PRINTSPHERE_BOARD=waveshare|onx3248g035`
-   or an IDF Kconfig equivalent.
-2. Make `main` depend on exactly one board BSP component:
+1. The current board selection option is
+   `PRINTSPHERE_BOARD=waveshare_amoled_1_75|onx3248g035`.
+2. The root `CMakeLists.txt` limits local components per board profile before
+   `project()`, and `main/CMakeLists.txt` depends on exactly one board BSP
+   component:
    - `esp32_s3_touch_amoled_1_75` for current Waveshare builds.
-   - an ONX PrintSphere-compatible BSP adapter for ONX builds.
+   - `onx3248g035_bsp` for ONX builds.
 3. Keep the `bsp/*` public header shape compatible so `ui.cpp` can stay stable
    for M3.
 4. Add an ONX-specific PMU/power provider or a temporary no-PMU provider.

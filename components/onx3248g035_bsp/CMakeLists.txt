@@ -1,6 +1,7 @@
 idf_component_register(
     SRCS
         "src/onx3248g035_bsp.c"
+        "src/onx3248g035_bsp_compat.c"
     INCLUDE_DIRS
         "include"
     REQUIRES
