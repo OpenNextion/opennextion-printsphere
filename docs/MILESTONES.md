@@ -58,6 +58,7 @@ Current status:
 - Minimal BSP smoke firmware added at `examples/onx_bsp_smoke`.
 - Build and flash passed on 2026-06-02.
 - Serial logs prove I2C, PCF8574, GPIO6 backlight PWM, ST7796 init, LCD color fills, and CST826 chip ID read.
+- Remaining manual acceptance steps are documented in `docs/M2_BSP_ACCEPTANCE.md`.
 
 Tasks:
 
