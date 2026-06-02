@@ -1,0 +1,1024 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PrintSphere ONX UI Design Preview</title>
+  <style>
+    :root {
+      --bg: #050607;
+      --panel: #111418;
+      --panel-2: #171b20;
+      --line: #2d333b;
+      --muted: #8b98a8;
+      --soft: #c8d1dc;
+      --text: #f7fafc;
+      --green: #4ade80;
+      --blue: #60a5fa;
+      --cyan: #87ceeb;
+      --amber: #f0a64b;
+      --red: #ef4444;
+      --purple: #a78bfa;
+      --screen-w: 320px;
+      --screen-h: 480px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #d8dde3;
+      color: #1d2730;
+      font-family: "Avenir Next", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.4;
+    }
+
+    header {
+      padding: 28px 32px 12px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 30px 0 14px;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0;
+      max-width: 980px;
+      color: #475569;
+      font-size: 14px;
+    }
+
+    .note {
+      margin: 14px 32px 0;
+      padding: 12px 14px;
+      max-width: 1000px;
+      border-left: 4px solid #3b82f6;
+      background: #f8fafc;
+      color: #334155;
+      font-size: 14px;
+    }
+
+    main {
+      padding: 0 32px 40px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 24px;
+      align-items: start;
+    }
+
+    .section {
+      margin-top: 24px;
+    }
+
+    .compare {
+      display: grid;
+      grid-template-columns: minmax(360px, 466px) minmax(340px, 1fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    @media (max-width: 920px) {
+      header, main { padding-left: 18px; padding-right: 18px; }
+      .note { margin-left: 18px; margin-right: 18px; }
+      .compare { grid-template-columns: 1fr; }
+    }
+
+    .caption {
+      margin: 0 0 10px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #334155;
+    }
+
+    .mapping {
+      margin-top: 14px;
+      border-collapse: collapse;
+      width: 100%;
+      max-width: 1020px;
+      font-size: 13px;
+      background: #fff;
+      border: 1px solid #cbd5e1;
+    }
+
+    .mapping th, .mapping td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #e2e8f0;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .mapping th {
+      background: #f1f5f9;
+      color: #334155;
+    }
+
+    .old-round-wrap {
+      width: 466px;
+      max-width: 100%;
+      margin: 0 auto;
+    }
+
+    .old-round {
+      position: relative;
+      width: 466px;
+      height: 466px;
+      max-width: 100%;
+      aspect-ratio: 1;
+      overflow: hidden;
+      border-radius: 50%;
+      background: #000;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, .28);
+      transform-origin: top left;
+    }
+
+    .old-ring {
+      position: absolute;
+      inset: 16px;
+      border-radius: 50%;
+      border: 22px solid #101010;
+      border-top-color: #4ade80;
+      border-right-color: #4ade80;
+      transform: rotate(34deg);
+    }
+
+    .old-progress {
+      position: absolute;
+      left: 0;
+      top: 42px;
+      width: 100%;
+      text-align: center;
+      color: var(--text);
+      font-size: 40px;
+      font-weight: 600;
+    }
+
+    .old-bat {
+      position: absolute;
+      left: 0;
+      top: 91px;
+      width: 100%;
+      color: var(--text);
+      font-size: 17px;
+      text-align: center;
+    }
+
+    .old-status {
+      position: absolute;
+      top: 136px;
+      left: 52px;
+      width: 362px;
+      text-align: center;
+      color: var(--text);
+      font-size: 32px;
+      font-weight: 600;
+    }
+
+    .old-logo {
+      position: absolute;
+      left: 173px;
+      top: 176px;
+      width: 120px;
+      height: 120px;
+    }
+
+    .old-temp {
+      position: absolute;
+      top: 226px;
+      color: var(--text);
+      font-size: 28px;
+      font-weight: 600;
+    }
+
+    .old-temp.left { left: 44px; }
+    .old-temp.right { right: 44px; text-align: right; }
+
+    .old-layer {
+      position: absolute;
+      left: 0;
+      top: 302px;
+      width: 100%;
+      color: #ddd;
+      text-align: center;
+      font-size: 30px;
+      font-weight: 600;
+    }
+
+    .old-detail {
+      position: absolute;
+      left: 70px;
+      top: 348px;
+      width: 326px;
+      color: #94a3b8;
+      text-align: center;
+      font-size: 19px;
+    }
+
+    .old-time {
+      position: absolute;
+      left: 0;
+      bottom: 48px;
+      width: 100%;
+      color: var(--cyan);
+      text-align: center;
+      font-size: 38px;
+      font-weight: 600;
+    }
+
+    .phone {
+      width: var(--screen-w);
+      height: var(--screen-h);
+      position: relative;
+      margin: 0 auto;
+      overflow: hidden;
+      border-radius: 18px;
+      background: var(--bg);
+      color: var(--text);
+      box-shadow: 0 18px 40px rgba(15, 23, 42, .28);
+      outline: 8px solid #1f2933;
+      outline-offset: 0;
+    }
+
+    .phone::after {
+      content: "320 x 480";
+      position: absolute;
+      right: 10px;
+      bottom: 5px;
+      color: rgba(148, 163, 184, .38);
+      font-size: 10px;
+      pointer-events: none;
+    }
+
+    .screen {
+      position: absolute;
+      inset: 0;
+      padding: 12px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 30px;
+      gap: 8px;
+      color: var(--soft);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .topbar .title {
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      color: var(--text);
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .topbar .meta {
+      flex: 0 0 auto;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 24px;
+      padding: 0 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .04);
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .touch {
+      outline: 1px dashed rgba(96, 165, 250, .55);
+      outline-offset: -1px;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .accent {
+      color: var(--green);
+    }
+
+    .warn {
+      color: var(--amber);
+    }
+
+    .danger {
+      color: var(--red);
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255,255,255,.045);
+    }
+
+    .printer-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 18px;
+      height: 348px;
+      overflow: hidden;
+    }
+
+    .printer-card {
+      min-height: 76px;
+      padding: 10px 12px 9px;
+      border-left: 5px solid #334155;
+    }
+
+    .printer-card.active {
+      border-left-color: var(--green);
+      background: rgba(74, 222, 128, .09);
+    }
+
+    .printer-name {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--text);
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      margin-right: 6px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+
+    .dot.ok { background: var(--green); }
+    .dot.warn { background: var(--amber); }
+    .dot.err { background: var(--red); }
+
+    .bottom-hint {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 16px;
+      min-height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+      border-top: 1px solid rgba(255,255,255,.08);
+      padding-top: 8px;
+    }
+
+    .ams-summary {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .tray-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .tray {
+      position: relative;
+      min-height: 102px;
+      padding: 10px;
+      overflow: hidden;
+      border: 2px solid rgba(255,255,255,.16);
+      border-radius: 8px;
+      background: #333;
+    }
+
+    .tray.light {
+      color: #050607;
+      text-shadow: none;
+    }
+
+    .tray.empty {
+      color: var(--muted);
+      background: #20242a;
+      border-style: dashed;
+    }
+
+    .tray.error {
+      border-color: var(--red);
+      box-shadow: inset 0 0 0 1px rgba(239, 68, 68, .5);
+    }
+
+    .tray .mat {
+      font-size: 20px;
+      font-weight: 800;
+    }
+
+    .tray .brand {
+      margin-top: 2px;
+      font-size: 12px;
+      opacity: .88;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tray .pct {
+      position: absolute;
+      left: 10px;
+      bottom: 10px;
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    .tray .flag {
+      position: absolute;
+      right: 8px;
+      bottom: 8px;
+      min-width: 34px;
+      height: 22px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.35);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .ext-row {
+      margin-top: 16px;
+      min-height: 44px;
+      padding: 9px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 14px;
+    }
+
+    .status-hero {
+      display: grid;
+      grid-template-columns: 68px 1fr;
+      gap: 10px;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .logo-btn {
+      width: 60px;
+      height: 60px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: rgba(255,255,255,.05);
+    }
+
+    .logo-btn img {
+      width: 52px;
+      height: 52px;
+      object-fit: contain;
+    }
+
+    .job {
+      min-width: 0;
+      color: var(--text);
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.16;
+    }
+
+    .detail {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .progress-block {
+      margin-top: 18px;
+      padding: 14px 12px 12px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--line);
+    }
+
+    .progress-main {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .percent {
+      font-size: 42px;
+      line-height: 1;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .state {
+      font-size: 24px;
+      line-height: 1;
+      color: var(--green);
+      font-weight: 800;
+      text-align: right;
+    }
+
+    .state.paused {
+      color: var(--amber);
+    }
+
+    .bar {
+      height: 12px;
+      margin-top: 12px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #20252b;
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--green), var(--blue));
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .metric {
+      min-height: 66px;
+      padding: 9px 10px;
+    }
+
+    .metric .label {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .metric .value {
+      margin-top: 2px;
+      color: var(--text);
+      font-size: 28px;
+      font-weight: 800;
+    }
+
+    .time-row {
+      min-height: 48px;
+      margin-top: 12px;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--cyan);
+      font-size: 26px;
+      font-weight: 800;
+    }
+
+    .pin-row {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .cover-box {
+      width: 296px;
+      height: 296px;
+      margin-top: 18px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background:
+        linear-gradient(135deg, rgba(96,165,250,.18), rgba(74,222,128,.08)),
+        repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 8px, rgba(255,255,255,.02) 8px 16px);
+      color: rgba(255,255,255,.82);
+      text-align: center;
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .cover-title {
+      margin-top: 16px;
+      color: var(--text);
+      font-size: 20px;
+      font-weight: 800;
+      line-height: 1.12;
+    }
+
+    .cover-sub {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .camera-box {
+      width: 296px;
+      height: 166px;
+      margin-top: 14px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background:
+        radial-gradient(circle at 22% 28%, #4b5563 0 22px, transparent 24px),
+        linear-gradient(160deg, #111827, #253041 54%, #0f172a);
+      color: rgba(255,255,255,.78);
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .camera-info {
+      margin-top: 18px;
+      display: grid;
+      gap: 10px;
+      color: var(--soft);
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .error-panel {
+      margin-top: 16px;
+      padding: 13px 12px;
+      border: 1px solid rgba(239,68,68,.75);
+      border-radius: 8px;
+      background: rgba(239,68,68,.10);
+    }
+
+    .error-panel .big {
+      color: var(--red);
+      font-size: 28px;
+      font-weight: 850;
+    }
+
+    .overlay-demo {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: rgba(0,0,0,.25);
+    }
+
+    .pin-card {
+      width: 280px;
+      padding: 18px 22px;
+      border: 2px solid var(--amber);
+      border-radius: 18px;
+      background: rgba(7,16,24,.94);
+      text-align: center;
+    }
+
+    .pin-card .label {
+      color: var(--text);
+      font-size: 17px;
+      font-weight: 800;
+    }
+
+    .pin-card .pin {
+      margin-top: 8px;
+      color: var(--amber);
+      font-size: 42px;
+      line-height: 1;
+      font-weight: 850;
+    }
+
+    .pin-card .sub {
+      margin-top: 10px;
+      color: var(--soft);
+      font-size: 15px;
+    }
+
+    .brightness-card {
+      min-width: 104px;
+      padding: 10px 18px;
+      border-radius: 16px;
+      background: rgba(0,0,0,.72);
+      color: var(--text);
+      font-size: 40px;
+      font-weight: 850;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>PrintSphere ONX 320x480 UI 静态设计稿</h1>
+    <p>草案：用于确认原 466x466 圆屏内容如何迁移到 ONX3248G035 竖屏矩形 UI。原型优先复用原项目视觉资源和文本语义：Dosis 数字风格、MDI 图标语义、Bambu logo、黑底高对比仪表盘。</p>
+  </header>
+
+  <div class="note">
+    说明：这些画面是 HTML/CSS 静态 mock，尺寸按 320 x 480 像素固定绘制。蓝色虚线表示 44px 以上的主要触控区域。图标在原型中以文字/符号近似表达，最终 LVGL 应优先使用现有 `mdi_30`、`mdi_40` 和 `bambuicon_small`。
+  </div>
+
+  <main>
+    <section class="section">
+      <h2>原 466x466 圆屏主 UI 内容结构摘要</h2>
+      <div class="compare">
+        <div>
+          <div class="caption">原 PrintSphere 圆屏主状态页重建示意</div>
+          <div class="old-round-wrap">
+            <div class="old-round">
+              <div class="old-ring"></div>
+              <div class="old-progress">87%</div>
+              <div class="old-bat">BAT 92%</div>
+              <div class="old-status">printing</div>
+              <img class="old-logo" src="assets/bambuicon_small.png" alt="Bambu">
+              <div class="old-temp left">Nozzle<br>220C</div>
+              <div class="old-temp right">Bed<br>65C</div>
+              <div class="old-layer">Layer: 122 / 350</div>
+              <div class="old-detail">Bambu_P1S_gearbox_cover</div>
+              <div class="old-time">1h 24m</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="caption">迁移原则</div>
+          <table class="mapping">
+            <thead>
+              <tr><th>原 UI 内容</th><th>ONX 新区域</th><th>处理方式</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>全屏圆形进度环</td><td>主状态页 compact progress</td><td>重排：默认横向进度条，可选小圆弧</td></tr>
+              <tr><td>中央 Bambu logo</td><td>状态页左上 logo/light 按钮</td><td>复用 `bambuicon_small`，缩小显示</td></tr>
+              <tr><td>温度左右分布</td><td>状态页双列 metric 卡片</td><td>重排：适配 320px 宽度</td></tr>
+              <tr><td>AMS 四槽横向 pill</td><td>AMS 页 2x2 tray grid</td><td>重排：保留槽位信息和颜色</td></tr>
+              <tr><td>封面图 320x320</td><td>封面页 296x296</td><td>缩放：保留 contain 模式</td></tr>
+              <tr><td>相机图 400x224</td><td>相机页 296x166/210</td><td>缩放：控制内存和宽度</td></tr>
+              <tr><td>长按 PIN / 亮度拖动</td><td>全局 overlay</td><td>保留交互语义</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>ONX 320x480 新 UI：8 个逻辑页面</h2>
+      <div class="grid">
+        <div>
+          <div class="caption">1. 打印机选择页</div>
+          <div class="phone">
+            <div class="screen">
+              <div class="topbar"><div class="title">Printers</div><div class="meta">Wi-Fi</div></div>
+              <div class="printer-list">
+                <div class="printer-card active card touch">
+                  <div class="printer-name"><span>Studio P1S</span><span class="pill">active</span></div>
+                  <div class="small">P1S · 192.168.1.24</div>
+                  <div class="small"><span class="dot ok"></span>Online · Hybrid</div>
+                </div>
+                <div class="printer-card card touch">
+                  <div class="printer-name"><span>A1 Mini</span><span class="pill">2</span></div>
+                  <div class="small">A1M · cloud/local</div>
+                  <div class="small"><span class="dot warn"></span>Waiting for LAN</div>
+                </div>
+                <div class="printer-card card touch">
+                  <div class="printer-name"><span>Workshop X1C</span><span class="pill">3</span></div>
+                  <div class="small">X1C · 192.168.1.42</div>
+                  <div class="small"><span class="dot err"></span>Offline</div>
+                </div>
+              </div>
+              <div class="bottom-hint">Open 192.168.1.24 · Hold for PIN</div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="caption">2. AMS 1：含 EXT 外置料卷</div>
+          <div class="phone">
+            <div class="screen">
+              <div class="topbar"><div class="title">AMS 1</div><div class="meta">2/8</div></div>
+              <div class="ams-summary"><span>Humidity 32%</span><span>Temp 28C</span></div>
+              <div class="tray-grid">
+                <div class="tray light touch" style="background:#62c46b">
+                  <div class="mat">PLA</div><div class="brand">Bambu Basic</div><div class="pct">86%</div><div class="flag">&gt;</div>
+                </div>
+                <div class="tray light touch" style="background:#f59e0b">
+                  <div class="mat">PETG</div><div class="brand">Translucent</div><div class="pct">42%</div>
+                </div>
+                <div class="tray empty touch">
+                  <div class="mat">Empty</div><div class="brand">Slot 3</div><div class="pct">--</div>
+                </div>
+                <div class="tray error touch" style="background:#101010">
+                  <div class="mat">ASA</div><div class="brand">Black</div><div class="pct">18%</div><div class="flag" style="background:var(--red)">ERR</div>
+                </div>
+              </div>
+              <div class="ext-row card touch"><span>EXT · PLA white</span><span class="accent">active</span></div>
+              <div class="bottom-hint">槽位颜色/材料/余量/错误保留</div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="caption">3. AMS 2</div>
+          <div class="phone">
+            <div class="screen">
+              <div class="topbar"><div class="title">AMS 2</div><div class="meta">3/8</div></div>
+              <div class="ams-summary"><span>Humidity --</span><span>Temp --C</span></div>
+              <div class="tray-grid">
+                <div class="tray light touch" style="background:#e5e7eb"><div class="mat">PLA</div><div class="brand">White</div><div class="pct">73%</div></div>
+                <div class="tray light touch" style="background:#38bdf8"><div class="mat">PLA</div><div class="brand">Cyan</div><div class="pct">61%</div></div>
+                <div class="tray light touch" style="background:#fb7185"><div class="mat">PLA</div><div class="brand">Pink</div><div class="pct">55%</div></div>
+                <div class="tray empty touch"><div class="mat">Empty</div><div class="brand">Slot 4</div><div class="pct">--</div></div>
+              </div>
+              <div class="bottom-hint">多 AMS 时保留独立页面</div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="caption">4. AMS 3：无 AMS/跳过态示意</div>
+          <div class="phone">
+            <div class="screen">
+              <div class="topbar"><div class="title">AMS 3</div><div class="meta">4/8</div></div>
+              <div style="height:360px; display:grid; place-items:center; text-align:center; color:var(--muted);">
+                <div>
+                  <div style="font-size:24px; color:var(--soft); font-weight:800;">No AMS connected</div>
+                  <div style="margin-top:10px; font-size:14px;">实际导航中可跳过此页</div>
+                </div>
+              </div>
+              <div class="bottom-hint">待确认：跳过还是显示占位</div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="caption">5. AMS 4：错误优先态</div>
+          <div class="phone">
+            <div class="screen">
+              <div class="topbar"><div class="title">AMS 4</div><div class="meta danger">ERR</div></div>
+              <div class="error-panel">
+                <div class="big">AMS slot error</div>
+                <div class="small">Slot 2 filament feed failed</div>
+              </div>
+              <div class="tray-grid">
+                <div class="tray touch" style="background:#222"><div class="mat">PLA</div><div class="brand">Gray</div><div class="pct">91%</div></div>
+                <div class="tray error touch" style="background:#dc2626"><div class="mat">PETG</div><div class="brand">Red</div><div class="pct">33%</div><div class="flag">ERR</div></div>
+                <div class="tray empty touch"><div class="mat">Empty</div><div class="brand">Slot 3</div><div class="pct">--</div></div>
+                <div class="tray touch" style="background:#78350f"><div class="mat">ASA</div><div class="brand">Brown</div><div class="pct">24%</div></div>
+              </div>
+              <div class="bottom-hint">红边 + ERR 替代原复杂菱形覆盖</div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="caption">6A. 主状态页：printing</div>
+          <div class="phone">
+            <div class="screen">
+              <div class="topbar"><div class="title">87% Printing</div><div class="meta">BAT 92%</div></div>
+              <div class="status-hero">
+                <div class="logo-btn touch"><img src="assets/bambuicon_small.png" alt="Bambu"></div>
+                <div>
+                  <div class="job">Bambu_P1S_gearbox_cover</div>
+                  <div class="detail">Layer 122 / 350 · Hybrid</div>
+                </div>
+              </div>
+              <div class="progress-block">
+                <div class="progress-main"><div class="percent">87%</div><div class="state">Printing</div></div>
+                <div class="bar"><span style="width:87%"></span></div>
+              </div>
+              <div class="metrics">
+                <div class="metric card"><div class="label">Nozzle</div><div class="value">220C</div></div>
+                <div class="metric card"><div class="label">Bed</div><div class="value">65C</div></div>
+                <div class="metric card"><div class="label">Aux</div><div class="value" style="font-size:22px">L 219C</div></div>
+                <div class="metric card"><div class="label">Chamber</div><div class="value" style="font-size:22px">38C</div></div>
+              </div>
+              <div class="time-row card touch"><span>Remaining</span><span>1h24m</span></div>
+              <div class="pin-row">Open 192.168.1.24 · Hold for PIN</div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="caption">6B. 主状态页：paused / error</div>
+          <div class="phone">
+            <div class="screen">
+              <div class="topbar"><div class="title warn">Paused</div><div class="meta">BAT 41%</div></div>
+              <div class="status-hero">
+                <div class="logo-btn"><img src="assets/bambuicon_small.png" alt="Bambu" style="filter:grayscale(1); opacity:.7"></div>
+                <div>
+                  <div class="job">A1Mini_top_cover</div>
+                  <div class="detail danger">HMS: filament runout detected</div>
+                </div>
+              </div>
+              <div class="error-panel">
+                <div class="big">Needs attention</div>
+                <div class="small">Replace filament or clear AMS slot 4.</div>
+              </div>
+              <div class="progress-block">
+                <div class="progress-main"><div class="percent">63%</div><div class="state paused">Paused</div></div>
+                <div class="bar"><span style="width:63%; background:linear-gradient(90deg,var(--amber),var(--red));"></span></div>
+              </div>
+              <div class="metrics">
+                <div class="metric card"><div class="label">Nozzle</div><div class="value">180C</div></div>
+                <div class="metric card"><div class="label">Bed</div><div class="value">55C</div></div>
+              </div>
+              <div class="time-row card touch"><span>ETA</span><span>18:42</span></div>
+              <div class="pin-row">Hold for Web Config PIN</div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="caption">7. 封面预览页</div>
+          <div class="phone">
+            <div class="screen">
+              <div class="topbar"><div class="title">Cover</div><div class="meta">7/8</div></div>
+              <div class="cover-box">cloud cover<br>296 x 296</div>
+              <div class="cover-title">Bambu_P1S_gearbox_cover</div>
+              <div class="cover-sub">PLA matte black · Preparing cover</div>
+              <div class="bottom-hint">运行时封面图，非静态资源</div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="caption">8. 相机页</div>
+          <div class="phone">
+            <div class="screen">
+              <div class="topbar"><div class="title">Camera</div><div class="meta">8/8</div></div>
+              <div class="pill" style="margin-top:6px;">Printing · local snapshot</div>
+              <div class="camera-box touch">tap image to refresh</div>
+              <div class="camera-info">
+                <div>Layer 122 / 350</div>
+                <div class="muted">Auto-refresh every 2s while open</div>
+                <div class="muted">Source: local JPEG snapshot</div>
+              </div>
+              <div class="bottom-hint">控制 296px 宽，降低内存风险</div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="caption">全局覆盖层：Web Config PIN</div>
+          <div class="phone">
+            <div class="screen">
+              <div class="topbar"><div class="title">Printing</div><div class="meta">BAT 92%</div></div>
+              <div class="progress-block" style="margin-top:70px; opacity:.45">
+                <div class="progress-main"><div class="percent">87%</div><div class="state">Printing</div></div>
+                <div class="bar"><span style="width:87%"></span></div>
+              </div>
+            </div>
+            <div class="overlay-demo">
+              <div class="pin-card">
+                <div class="label">WEB CONFIG PIN</div>
+                <div class="pin">123456</div>
+                <div class="sub">Valid for 2m. Enter it in the browser.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="caption">全局覆盖层：亮度拖动</div>
+          <div class="phone">
+            <div class="screen">
+              <div class="topbar"><div class="title">Cover</div><div class="meta">7/8</div></div>
+              <div class="cover-box" style="opacity:.35">cloud cover</div>
+            </div>
+            <div class="overlay-demo">
+              <div class="brightness-card">80%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -54,12 +54,20 @@ Scope:
 - LVGL page structure.
 - Status page, cover page, camera page, AMS page simplification.
 - Text fitting and touch interactions.
+- HTML visual preview and draft UI design spec before implementation.
+- Resource reuse policy: prefer existing PrintSphere fonts, Material Design Icons subsets, and embedded Bambu image before adding new bitmap/icon assets.
+- Visual implementation constraints and interaction contract in `docs/UI_DESIGN_SPEC.md`.
+- Interaction ownership: page availability, pager behavior, brightness gesture, long-press PIN, printer card switching, camera refresh, chamber-light logo toggle, remaining/ETA toggle, and no-op boundaries for display-only controls.
 
 Boundaries:
 
 - Should not change printer protocol parsing.
 - Should not modify board drivers.
 - Should target demo usability before full feature parity.
+- The visual direction has been approved; UI implementation threads must follow `docs/UI_DESIGN_SPEC.md` for layout, dimensions, colors, fonts, page flow, and interaction behavior.
+- UI implementation threads must not invent new buttons, printer controls, AMS actions, settings entries, or protocol fields outside the spec.
+- If original PrintSphere behavior is unclear, implementation threads must report back to the main thread/UI Layout owner before changing protocol, state binding, or user-visible behavior.
+- Spec changes after visual approval or interaction-contract approval require main-thread acceptance.
 
 ## Build / Release Thread
 
