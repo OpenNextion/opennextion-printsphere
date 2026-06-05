@@ -1,0 +1,849 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PrintSphere ONX Landscape UI Preview</title>
+  <style>
+    :root {
+      --bg: #050607;
+      --panel: #111418;
+      --panel2: #171b20;
+      --line: #2d333b;
+      --muted: #8b98a8;
+      --soft: #c8d1dc;
+      --text: #f7fafc;
+      --green: #4ade80;
+      --blue: #60a5fa;
+      --cyan: #87ceeb;
+      --amber: #f0a64b;
+      --red: #ef4444;
+      --w: 480px;
+      --h: 320px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #d8dde3;
+      color: #1f2937;
+      font-family: "Avenir Next", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.4;
+    }
+
+    header {
+      padding: 26px 32px 12px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 28px 0 14px;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0;
+      max-width: 1080px;
+      color: #475569;
+      font-size: 14px;
+    }
+
+    main {
+      padding: 0 32px 44px;
+    }
+
+    .note {
+      margin: 14px 32px 0;
+      padding: 12px 14px;
+      max-width: 1080px;
+      border-left: 4px solid #0ea5e9;
+      background: #f8fafc;
+      color: #334155;
+      font-size: 14px;
+    }
+
+    .mapping {
+      width: 100%;
+      max-width: 1100px;
+      border-collapse: collapse;
+      background: #fff;
+      border: 1px solid #cbd5e1;
+      font-size: 13px;
+    }
+
+    .mapping th, .mapping td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #e2e8f0;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .mapping th {
+      background: #f1f5f9;
+      color: #334155;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(520px, 1fr));
+      gap: 28px;
+      align-items: start;
+    }
+
+    .caption {
+      margin: 0 0 10px;
+      color: #334155;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .device {
+      position: relative;
+      width: var(--w);
+      height: var(--h);
+      overflow: hidden;
+      border-radius: 14px;
+      outline: 8px solid #1f2933;
+      background: var(--bg);
+      color: var(--text);
+      box-shadow: 0 18px 40px rgba(15,23,42,.28);
+    }
+
+    .device::after {
+      content: "480 x 320";
+      position: absolute;
+      right: 9px;
+      bottom: 4px;
+      color: rgba(148,163,184,.34);
+      font-size: 10px;
+      pointer-events: none;
+    }
+
+    .screen {
+      position: absolute;
+      inset: 0;
+      padding: 10px 12px;
+    }
+
+    .topbar {
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .title {
+      min-width: 0;
+      overflow: hidden;
+      color: var(--text);
+      font-size: 18px;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255,255,255,.045);
+    }
+
+    .touch {
+      outline: 1px dashed rgba(96,165,250,.62);
+      outline-offset: -1px;
+    }
+
+    .pill {
+      display: inline-flex;
+      min-height: 22px;
+      align-items: center;
+      justify-content: center;
+      padding: 0 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,.05);
+      color: var(--soft);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .muted { color: var(--muted); }
+    .soft { color: var(--soft); }
+    .green { color: var(--green); }
+    .amber { color: var(--amber); }
+    .red { color: var(--red); }
+    .cyan { color: var(--cyan); }
+
+    .bottom {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 8px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 12px;
+      border-top: 1px solid rgba(255,255,255,.08);
+      padding-top: 5px;
+    }
+
+    .printer-layout {
+      display: grid;
+      grid-template-columns: 300px 144px;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .printer-list {
+      height: 228px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    .printer-card {
+      min-height: 66px;
+      padding: 8px 10px 7px;
+      border-left: 5px solid #334155;
+    }
+
+    .printer-card.active {
+      border-left-color: var(--green);
+      background: rgba(74,222,128,.09);
+    }
+
+    .printer-name {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 17px;
+      font-weight: 850;
+    }
+
+    .small {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .detail-panel {
+      height: 228px;
+      padding: 12px;
+    }
+
+    .detail-panel .big {
+      font-size: 22px;
+      font-weight: 850;
+      line-height: 1;
+    }
+
+    .ams-meta {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .tray-row {
+      height: 132px;
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .tray {
+      position: relative;
+      min-height: 128px;
+      padding: 10px 8px;
+      overflow: hidden;
+      border: 2px solid rgba(255,255,255,.16);
+      border-radius: 8px;
+      background: #333;
+    }
+
+    .tray.light { color: #050607; }
+    .tray.empty {
+      color: var(--muted);
+      background: #20242a;
+      border-style: dashed;
+    }
+    .tray.error {
+      border-color: var(--red);
+      box-shadow: inset 0 0 0 1px rgba(239,68,68,.5);
+    }
+
+    .mat { font-size: 20px; font-weight: 900; }
+    .brand {
+      margin-top: 3px;
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      opacity: .88;
+    }
+    .pct {
+      position: absolute;
+      left: 8px;
+      bottom: 8px;
+      font-size: 20px;
+      font-weight: 900;
+    }
+    .flag {
+      position: absolute;
+      right: 7px;
+      bottom: 7px;
+      min-width: 32px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      border-radius: 999px;
+      background: rgba(0,0,0,.36);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .ext-row {
+      height: 44px;
+      margin-top: 12px;
+      padding: 9px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .ams-note {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 196px 248px;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .main-left {
+      height: 228px;
+      padding: 12px;
+    }
+
+    .hero-row {
+      display: grid;
+      grid-template-columns: 58px 1fr;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .logo {
+      width: 54px;
+      height: 54px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: rgba(255,255,255,.05);
+    }
+
+    .logo img {
+      width: 48px;
+      height: 48px;
+      object-fit: contain;
+    }
+
+    .percent {
+      font-size: 38px;
+      line-height: .95;
+      font-weight: 900;
+    }
+
+    .state {
+      margin-top: 4px;
+      color: var(--green);
+      font-size: 21px;
+      font-weight: 900;
+    }
+
+    .bar {
+      height: 12px;
+      margin-top: 14px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #20252b;
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg,var(--green),var(--blue));
+    }
+
+    .time-row {
+      height: 50px;
+      margin-top: 16px;
+      padding: 7px 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      color: var(--cyan);
+      font-weight: 900;
+    }
+
+    .time-row .label { font-size: 12px; }
+    .time-row .value { font-size: 25px; line-height: 1; }
+
+    .main-right {
+      height: 228px;
+    }
+
+    .job {
+      height: 44px;
+      overflow: hidden;
+      color: var(--text);
+      font-size: 19px;
+      font-weight: 900;
+      line-height: 1.15;
+    }
+
+    .layer {
+      margin-top: 4px;
+      color: var(--soft);
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 9px;
+    }
+
+    .metric {
+      height: 38px;
+      padding: 5px 8px;
+    }
+
+    .metric .label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .metric .value {
+      color: var(--text);
+      font-size: 20px;
+      line-height: 1;
+      font-weight: 900;
+    }
+
+    .message {
+      height: 54px;
+      margin-top: 10px;
+      padding: 8px 10px;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.25;
+    }
+
+    .message.error {
+      border-color: rgba(239,68,68,.75);
+      background: rgba(239,68,68,.10);
+      color: var(--soft);
+    }
+
+    .cover-layout {
+      display: grid;
+      grid-template-columns: 240px 204px;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .cover-img {
+      width: 240px;
+      height: 240px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background:
+        linear-gradient(135deg, rgba(96,165,250,.20), rgba(74,222,128,.08)),
+        repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 8px, rgba(255,255,255,.02) 8px 16px);
+      color: rgba(255,255,255,.84);
+      font-size: 17px;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .cover-info {
+      height: 240px;
+      padding: 12px;
+    }
+
+    .cover-title {
+      max-height: 72px;
+      overflow: hidden;
+      font-size: 20px;
+      line-height: 1.15;
+      font-weight: 900;
+    }
+
+    .cover-info .line {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .camera-layout {
+      display: grid;
+      grid-template-columns: 300px 144px;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .camera-img {
+      width: 300px;
+      height: 224px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background:
+        radial-gradient(circle at 22% 25%, #4b5563 0 22px, transparent 24px),
+        linear-gradient(160deg,#111827,#253041 56%,#0f172a);
+      color: rgba(255,255,255,.82);
+      font-size: 16px;
+      font-weight: 900;
+    }
+
+    .camera-info {
+      height: 224px;
+      padding: 12px;
+    }
+
+    .camera-info .big {
+      color: var(--text);
+      font-size: 23px;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .camera-info .item {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .overlay-demo {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: rgba(0,0,0,.28);
+    }
+
+    .pin-card {
+      width: 280px;
+      padding: 18px 22px;
+      border: 2px solid var(--amber);
+      border-radius: 18px;
+      background: rgba(7,16,24,.95);
+      text-align: center;
+    }
+
+    .pin-card .pin-label {
+      color: var(--text);
+      font-size: 17px;
+      font-weight: 900;
+    }
+
+    .pin-card .pin {
+      margin-top: 8px;
+      color: var(--amber);
+      font-size: 42px;
+      line-height: 1;
+      font-weight: 900;
+    }
+
+    .pin-card .sub {
+      margin-top: 10px;
+      color: var(--soft);
+      font-size: 14px;
+    }
+
+    .brightness {
+      min-width: 104px;
+      padding: 10px 18px;
+      border-radius: 16px;
+      background: rgba(0,0,0,.72);
+      color: var(--text);
+      font-size: 40px;
+      line-height: 1;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    @media (max-width: 620px) {
+      header, main { padding-left: 16px; padding-right: 16px; }
+      .note { margin-left: 16px; margin-right: 16px; }
+      .grid { grid-template-columns: 1fr; }
+      .device { transform: scale(.72); transform-origin: top left; margin-bottom: -82px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>PrintSphere ONX 480x320 横屏 UI 静态设计稿</h1>
+    <p>草案：用于确认 ONX3248G035 横屏方向下的 PrintSphere 页面重排。设计基于同一套原项目页面和数据接口，不引入新的打印机控制协议。</p>
+  </header>
+
+  <div class="note">
+    说明：所有屏幕 mock 固定为 480 x 320。蓝色虚线表示 44px 以上主要触控区域；正式 LVGL 不显示虚线。图标和字体落地时优先复用 `bambuicon_small`、Dosis、MDI 字体子集。
+  </div>
+
+  <main>
+    <section>
+      <h2>原/竖屏内容到横屏区域映射</h2>
+      <table class="mapping">
+        <thead>
+          <tr><th>原内容/竖屏区域</th><th>横屏新区域</th><th>处理</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>原圆屏中心状态 + logo + 环形进度</td><td>Main 左侧状态卡</td><td>重排：logo、百分比、状态、进度条、remaining 集中在左栏</td></tr>
+          <tr><td>任务名、层数、温度、detail</td><td>Main 右侧信息区</td><td>重排：利用 480px 宽度并列显示，避免竖向拥挤</td></tr>
+          <tr><td>AMS 四槽信息</td><td>AMS 横向四槽 row</td><td>回归横向四槽，更接近原项目心智模型</td></tr>
+          <tr><td>Cover 296x296 竖屏图</td><td>Cover 左图右文</td><td>图片缩到 240x240，右侧保留标题和状态</td></tr>
+          <tr><td>Camera 竖屏 296x166/210</td><td>Camera 300x224 大图 + 右信息栏</td><td>横屏优先相机画面，同时保留 layer/source</td></tr>
+          <tr><td>长按 PIN / 亮度拖动 / 横向翻页</td><td>全局交互</td><td>沿用原交互契约，不新增按钮行为</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>480x320 横屏页面方案</h2>
+      <div class="grid">
+        <div>
+          <div class="caption">1. Printer Select</div>
+          <div class="device">
+            <div class="screen">
+              <div class="topbar"><div class="title">Printers</div><div>Open 192.168.1.24 · Hold PIN</div></div>
+              <div class="printer-layout">
+                <div class="printer-list">
+                  <div class="printer-card card active touch">
+                    <div class="printer-name"><span>Studio P1S</span><span class="pill">active</span></div>
+                    <div class="small">P1S · 192.168.1.24</div>
+                    <div class="small green">Online · Hybrid</div>
+                  </div>
+                  <div class="printer-card card touch">
+                    <div class="printer-name"><span>A1 Mini</span><span class="pill">2</span></div>
+                    <div class="small">A1M · cloud/local</div>
+                    <div class="small amber">Waiting for LAN</div>
+                  </div>
+                  <div class="printer-card card touch">
+                    <div class="printer-name"><span>Workshop X1C</span><span class="pill">3</span></div>
+                    <div class="small">X1C · 192.168.1.42</div>
+                    <div class="small red">Offline</div>
+                  </div>
+                </div>
+                <div class="detail-panel card">
+                  <div class="big">Active</div>
+                  <div class="small green">Studio P1S online</div>
+                  <div class="small">Host<br>192.168.1.24</div>
+                  <div class="small">Profile card tap switches printer.</div>
+                  <div class="pill" style="margin-top:12px;">no new controls</div>
+                </div>
+              </div>
+              <div class="bottom">Left/right swipe pages · card tap switch · hold for Web Config PIN</div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="caption">2. AMS 1</div>
+          <div class="device">
+            <div class="screen">
+              <div class="topbar">
+                <div class="title">AMS 1</div>
+                <div class="ams-meta"><span>Humidity 32%</span><span>Temp 28C</span><span>2/8</span></div>
+              </div>
+              <div class="tray-row">
+                <div class="tray light touch" style="background:#62c46b">
+                  <div class="mat">PLA</div><div class="brand">Bambu Basic</div><div class="pct">86%</div><div class="flag">&gt;</div>
+                </div>
+                <div class="tray light touch" style="background:#f59e0b">
+                  <div class="mat">PETG</div><div class="brand">Translucent</div><div class="pct">42%</div>
+                </div>
+                <div class="tray empty touch">
+                  <div class="mat">Empty</div><div class="brand">Slot 3</div><div class="pct">--</div>
+                </div>
+                <div class="tray error touch" style="background:#101010">
+                  <div class="mat">ASA</div><div class="brand">Black</div><div class="pct">18%</div><div class="flag" style="background:var(--red)">ERR</div>
+                </div>
+              </div>
+              <div class="ext-row card touch"><span>EXT · PLA white</span><span class="green">active</span></div>
+              <div class="ams-note">AMS tray / EXT are display or reserved no-op areas in first version.</div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="caption">6A. Main / Status - printing</div>
+          <div class="device">
+            <div class="screen">
+              <div class="topbar"><div class="title">87% Printing</div><div>BAT 92% · Hybrid</div></div>
+              <div class="main-grid">
+                <div class="main-left card">
+                  <div class="hero-row">
+                    <div class="logo touch"><img src="assets/bambuicon_small.png" alt="Bambu"></div>
+                    <div><div class="percent">87%</div><div class="state">Printing</div></div>
+                  </div>
+                  <div class="bar"><span style="width:87%"></span></div>
+                  <div class="time-row card touch"><div class="label">Remaining / tap ETA</div><div class="value">1h24m</div></div>
+                </div>
+                <div class="main-right">
+                  <div class="job">Bambu_P1S_gearbox_cover</div>
+                  <div class="layer">Layer 122 / 350</div>
+                  <div class="metric-grid">
+                    <div class="metric card"><div class="label">Nozzle</div><div class="value">220C</div></div>
+                    <div class="metric card"><div class="label">Bed</div><div class="value">65C</div></div>
+                    <div class="metric card"><div class="label">Aux</div><div class="value">L 219C</div></div>
+                    <div class="metric card"><div class="label">Chamber</div><div class="value">38C</div></div>
+                  </div>
+                  <div class="message card">Open 192.168.1.24 · Hold for Web Config PIN. Logo toggles chamber light only when supported.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="caption">6B. Main / Status - paused/error</div>
+          <div class="device">
+            <div class="screen">
+              <div class="topbar"><div class="title amber">Paused</div><div class="red">HMS alert</div></div>
+              <div class="main-grid">
+                <div class="main-left card">
+                  <div class="hero-row">
+                    <div class="logo"><img src="assets/bambuicon_small.png" alt="Bambu" style="filter:grayscale(1);opacity:.68"></div>
+                    <div><div class="percent">63%</div><div class="state amber">Paused</div></div>
+                  </div>
+                  <div class="bar"><span style="width:63%;background:linear-gradient(90deg,var(--amber),var(--red));"></span></div>
+                  <div class="time-row card touch"><div class="label">ETA / tap remaining</div><div class="value">18:42</div></div>
+                </div>
+                <div class="main-right">
+                  <div class="job">A1Mini_top_cover</div>
+                  <div class="layer">Layer 86 / 172</div>
+                  <div class="metric-grid">
+                    <div class="metric card"><div class="label">Nozzle</div><div class="value">180C</div></div>
+                    <div class="metric card"><div class="label">Bed</div><div class="value">55C</div></div>
+                  </div>
+                  <div class="message card error"><strong class="red">Needs attention</strong><br>Replace filament or clear AMS slot 4. No resume/cancel button in UI spec.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="caption">7. Cover Preview</div>
+          <div class="device">
+            <div class="screen">
+              <div class="topbar"><div class="title">Cover</div><div>cloud preview · 7/8</div></div>
+              <div class="cover-layout">
+                <div class="cover-img touch">cloud cover<br>240 x 240<br><span class="muted">tap no-op</span></div>
+                <div class="cover-info card">
+                  <div class="cover-title">Bambu_P1S_gearbox_cover</div>
+                  <div class="line">Preparing cover</div>
+                  <div class="line">PLA matte black</div>
+                  <div class="line">Source: Bambu Cloud preview blob</div>
+                  <div class="line">No static demo image required.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="caption">8. Camera</div>
+          <div class="device">
+            <div class="screen">
+              <div class="topbar"><div class="title">Camera</div><div>Printing · local snapshot · 8/8</div></div>
+              <div class="camera-layout">
+                <div class="camera-img touch">tap image<br>to refresh</div>
+                <div class="camera-info card">
+                  <div class="big">Layer</div>
+                  <div class="big">122 / 350</div>
+                  <div class="item">Auto-refresh every 2s while open</div>
+                  <div class="item">Source: local JPEG/RGB565 path</div>
+                  <div class="item cyan">Tap refresh request only</div>
+                </div>
+              </div>
+              <div class="bottom">Image bounds 300 x 224 · no extra cache or source-switch controls</div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="caption">Overlay: Web Config PIN</div>
+          <div class="device">
+            <div class="screen">
+              <div class="topbar"><div class="title">87% Printing</div><div>BAT 92%</div></div>
+              <div class="main-grid" style="opacity:.42">
+                <div class="main-left card"><div class="percent">87%</div><div class="state">Printing</div><div class="bar"><span style="width:87%"></span></div></div>
+                <div class="main-right"><div class="job">Bambu_P1S_gearbox_cover</div><div class="message card">Background content stays visible but inactive.</div></div>
+              </div>
+            </div>
+            <div class="overlay-demo">
+              <div class="pin-card">
+                <div class="pin-label">WEB CONFIG PIN</div>
+                <div class="pin">123456</div>
+                <div class="sub">Valid for 2m. Enter it in the browser.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="caption">Overlay: brightness drag</div>
+          <div class="device">
+            <div class="screen">
+              <div class="topbar"><div class="title">Camera</div><div>brightness gesture wins</div></div>
+              <div class="camera-layout" style="opacity:.35">
+                <div class="camera-img">camera</div>
+                <div class="camera-info card"><div class="big">No page swipe</div><div class="item">Vertical drag locks pager and consumes tap/PIN.</div></div>
+              </div>
+            </div>
+            <div class="overlay-demo">
+              <div class="brightness">80%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

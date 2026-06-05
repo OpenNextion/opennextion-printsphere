@@ -4,6 +4,8 @@
 
 本文档用于规划将原 PrintSphere 466 x 466 圆形/近圆形 AMOLED LVGL UI，移植到 ONX3248G035 的 320 x 480 竖屏矩形 LCD。`docs/ui_design_preview.html` 已作为视觉方向基准；开发线程应按本文档的尺寸、坐标、颜色、字体和资源约束高保真还原，实机上仅允许为触摸误差、字体渲染差异和 LCD 可读性做小幅校准。
 
+横屏 `480 x 320` 设计另见 `docs/UI_DESIGN_SPEC_LANDSCAPE.md`，静态预览为 `docs/ui_design_landscape_preview.html`。横屏视觉方向已确认，是独立 layout profile 规范，不应通过旋转或等比缩放本文档坐标实现。
+
 ## 目标
 
 - 保留原 PrintSphere 的核心信息和交互：打印状态、进度、任务名、温度、层数、剩余时间、封面图、相机图、AMS/耗材、错误提示、打印机选择、Web Config、PIN、亮度手势、滑动翻页。

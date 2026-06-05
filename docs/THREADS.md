@@ -57,6 +57,7 @@ Scope:
 - HTML visual preview and draft UI design spec before implementation.
 - Resource reuse policy: prefer existing PrintSphere fonts, Material Design Icons subsets, and embedded Bambu image before adding new bitmap/icon assets.
 - Visual implementation constraints and interaction contract in `docs/UI_DESIGN_SPEC.md`.
+- Landscape `480 x 320` approved visual direction and implementation constraints in `docs/UI_DESIGN_SPEC_LANDSCAPE.md` and `docs/ui_design_landscape_preview.html`.
 - Interaction ownership: page availability, pager behavior, brightness gesture, long-press PIN, printer card switching, camera refresh, chamber-light logo toggle, remaining/ETA toggle, and no-op boundaries for display-only controls.
 - Porting architecture boundaries and implementation slices in `docs/PORTING_ARCHITECTURE_BOUNDARIES.md`.
 
@@ -66,6 +67,7 @@ Boundaries:
 - Should not modify board drivers.
 - Should target demo usability before full feature parity.
 - The visual direction has been approved; UI implementation threads must follow `docs/UI_DESIGN_SPEC.md` for layout, dimensions, colors, fonts, page flow, and interaction behavior.
+- Landscape UI visual direction is user-approved; implementation may proceed only after main-thread review/scheduling and must follow `docs/UI_DESIGN_SPEC_LANDSCAPE.md` through a board/layout profile rather than App/Protocol business logic.
 - UI implementation threads must not invent new buttons, printer controls, AMS actions, settings entries, or protocol fields outside the spec.
 - If original PrintSphere behavior is unclear, implementation threads must report back to the main thread/UI Layout owner before changing protocol, state binding, or user-visible behavior.
 - Spec changes after visual approval or interaction-contract approval require main-thread acceptance.
