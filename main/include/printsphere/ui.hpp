@@ -285,6 +285,9 @@ class Ui {
   std::string last_diag_status_;
   std::string last_diag_detail_;
   std::string last_diag_stage_;
+  int last_diag_progress_ = -1;
+  uint16_t last_diag_current_layer_ = 0;
+  uint16_t last_diag_total_layers_ = 0;
   lv_image_dsc_t preview_image_dsc_{};
   std::shared_ptr<std::vector<uint8_t>> last_preview_blob_{};
   std::shared_ptr<std::vector<uint8_t>> last_preview_raw_{};

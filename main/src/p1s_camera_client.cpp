@@ -26,9 +26,20 @@ constexpr size_t kMaxFrameBytes = 256U * 1024U;
 constexpr size_t kImagePersistentReserveBytes = 20U * 1024U;
 constexpr int64_t kAutoRefreshIntervalUs = 1500000;
 constexpr int64_t kTlsReadDeadlineUs = 4000000;
+constexpr int64_t kTlsBodyIdleDeadlineUs = 4000000;
+constexpr int64_t kTlsBodyMaxDeadlineUs = 15000000;
 constexpr int64_t kTlsWriteDeadlineUs = 2000000;
 constexpr uint16_t kTargetWidth = 400;
 constexpr uint16_t kTargetHeight = 224;
+
+struct TlsReadDiag {
+  size_t bytes_read = 0;
+  ssize_t last_result = 0;
+  int64_t elapsed_us = 0;
+  bool idle_timeout = false;
+  bool total_timeout = false;
+  bool read_error = false;
+};
 
 bool has_frame_data(const std::shared_ptr<std::vector<uint8_t>>& frame_blob) {
   return frame_blob && !frame_blob->empty();
@@ -110,6 +121,50 @@ void log_blob_diag(const char* context, const std::shared_ptr<std::vector<uint8_
            static_cast<unsigned>(allocated_size(data)),
            ram_region(data), data);
   log_heap_diag(context);
+}
+
+bool read_exact_with_diag(esp_tls_t* tls, void* buffer, size_t length, int64_t idle_timeout_us,
+                          int64_t total_timeout_us, TlsReadDiag* diag) {
+  auto* out = static_cast<uint8_t*>(buffer);
+  size_t offset = 0;
+  const int64_t start_us = esp_timer_get_time();
+  int64_t idle_deadline_us = start_us + idle_timeout_us;
+  const int64_t total_deadline_us = start_us + total_timeout_us;
+  ssize_t last_result = 0;
+  bool idle_timeout = false;
+  bool total_timeout = false;
+  bool read_error = false;
+
+  while (offset < length) {
+    const int64_t now_us = esp_timer_get_time();
+    if (now_us >= total_deadline_us) {
+      total_timeout = true;
+      break;
+    }
+    if (now_us >= idle_deadline_us) {
+      idle_timeout = true;
+      break;
+    }
+
+    const ssize_t read = esp_tls_conn_read(tls, out + offset, length - offset);
+    last_result = read;
+    if (read <= 0) {
+      read_error = true;
+      break;
+    }
+    offset += static_cast<size_t>(read);
+    idle_deadline_us = esp_timer_get_time() + idle_timeout_us;
+  }
+
+  if (diag != nullptr) {
+    diag->bytes_read = offset;
+    diag->last_result = last_result;
+    diag->elapsed_us = esp_timer_get_time() - start_us;
+    diag->idle_timeout = idle_timeout;
+    diag->total_timeout = total_timeout;
+    diag->read_error = read_error;
+  }
+  return offset == length;
 }
 
 }  // namespace
@@ -235,20 +290,7 @@ bool P1sCameraClient::has_cached_frame() const {
 }
 
 bool P1sCameraClient::read_exact(esp_tls_t* tls, void* buffer, size_t length) {
-  auto* out = static_cast<uint8_t*>(buffer);
-  size_t offset = 0;
-  const int64_t deadline_us = esp_timer_get_time() + kTlsReadDeadlineUs;
-  while (offset < length) {
-    if (esp_timer_get_time() >= deadline_us) {
-      return false;
-    }
-    const ssize_t read = esp_tls_conn_read(tls, out + offset, length - offset);
-    if (read <= 0) {
-      return false;
-    }
-    offset += static_cast<size_t>(read);
-  }
-  return true;
+  return read_exact_with_diag(tls, buffer, length, kTlsReadDeadlineUs, kTlsReadDeadlineUs, nullptr);
 }
 
 bool P1sCameraClient::write_all(esp_tls_t* tls, const void* buffer, size_t length) {
@@ -431,15 +473,31 @@ bool P1sCameraClient::fetch_frame_once(const PrinterConnection& connection) {
       disconnect();
       return false;
     }
+    ESP_LOGI(kTag, "Camera frame header: index=%d size=%u marker=%u",
+             frame_index, static_cast<unsigned>(frame_size),
+             static_cast<unsigned>(frame_marker));
 
     auto jpeg_frame = std::make_shared<std::vector<uint8_t>>();
     jpeg_frame->reserve(std::max(static_cast<size_t>(frame_size), kImagePersistentReserveBytes));
     jpeg_frame->resize(frame_size);
-    if (!read_exact(tls_, jpeg_frame->data(), jpeg_frame->size())) {
-      ESP_LOGW(kTag, "Camera frame body read failed");
+    TlsReadDiag body_diag;
+    if (!read_exact_with_diag(tls_, jpeg_frame->data(), jpeg_frame->size(),
+                              kTlsBodyIdleDeadlineUs, kTlsBodyMaxDeadlineUs, &body_diag)) {
+      ESP_LOGW(kTag,
+               "Camera frame body read failed: size=%u read=%u last=%d elapsed_ms=%lld "
+               "idle_timeout=%d total_timeout=%d read_error=%d",
+               static_cast<unsigned>(frame_size),
+               static_cast<unsigned>(body_diag.bytes_read),
+               static_cast<int>(body_diag.last_result),
+               static_cast<long long>(body_diag.elapsed_us / 1000),
+               body_diag.idle_timeout ? 1 : 0, body_diag.total_timeout ? 1 : 0,
+               body_diag.read_error ? 1 : 0);
       disconnect();
       return false;
     }
+    ESP_LOGI(kTag, "Camera frame body read ok: size=%u elapsed_ms=%lld",
+             static_cast<unsigned>(frame_size),
+             static_cast<long long>(body_diag.elapsed_us / 1000));
     log_blob_diag("camera jpeg frame buffer", jpeg_frame);
 
     if (!enabled_.load()) {

@@ -1984,12 +1984,21 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
 
   // [DIAG] Log what the display is actually showing — on change only.
   if (status_text != last_diag_status_ || detail != last_diag_detail_ ||
-      snapshot.stage != last_diag_stage_) {
+      snapshot.stage != last_diag_stage_ || progress != last_diag_progress_ ||
+      snapshot.current_layer != last_diag_current_layer_ ||
+      snapshot.total_layers != last_diag_total_layers_) {
     last_diag_status_ = status_text;
     last_diag_detail_ = detail;
     last_diag_stage_ = snapshot.stage;
-    ESP_LOGI(kTag, "[DIAG] display: status=%s stage=%s detail=%.60s lifecycle=%s",
+    last_diag_progress_ = progress;
+    last_diag_current_layer_ = snapshot.current_layer;
+    last_diag_total_layers_ = snapshot.total_layers;
+    ESP_LOGI(kTag,
+             "[DIAG] display: status=%s stage=%s progress=%d layer=%u/%u "
+             "detail=%.60s lifecycle=%s",
              status_text.c_str(), snapshot.stage.c_str(),
+             progress, static_cast<unsigned>(snapshot.current_layer),
+             static_cast<unsigned>(snapshot.total_layers),
              detail.empty() ? "(-)" : detail.c_str(),
              to_string(snapshot.lifecycle));
   }

@@ -1621,6 +1621,11 @@ void PrinterClient::handle_report_payload(const char* payload, size_t length) {
     const PrintLifecycleState previous_lifecycle = runtime.lifecycle;
     const int previous_print_error_code = runtime.print_error_code;
     const uint16_t previous_hms_alert_count = runtime.hms_alert_count;
+    const uint16_t previous_current_layer = runtime.current_layer;
+    const uint16_t previous_total_layers = runtime.total_layers;
+    const float previous_nozzle_temp_c = runtime.nozzle_temp_c;
+    const float previous_bed_temp_c = runtime.bed_temp_c;
+    const uint32_t previous_remaining_seconds = runtime.remaining_seconds;
     const bool previous_pause_fault = runtime.has_error && is_paused_gcode_state(previous_raw_status);
     const bool previous_ams_change_latched = runtime.ams_filament_change_latched;
     const int previous_hw_switch_state = runtime.hw_switch_state;
@@ -1706,16 +1711,6 @@ void PrinterClient::handle_report_payload(const char* payload, size_t length) {
         (has_hw_switch_state_update && new_hw_switch_state != previous_hw_switch_state) ||
         (has_tray_now_update && new_tray_now != previous_tray_now) ||
         (has_tray_tar_update && new_tray_tar != previous_tray_tar);
-    if (diag_has_state_fields && diag_has_state_change) {
-      ESP_LOGI(kTag, "[DIAG] local mqtt: gcode=%s stg_cur=%d stage_name=%s ams_status=0x%04X "
-               "ams_change=%d(latch=%d) hw_switch=%d tray_now=%d tray_tar=%d",
-               gcode_state.empty() ? "(-)" : gcode_state.c_str(), stage_id,
-               stage_name.empty() ? "(-)" : stage_name.c_str(),
-               raw_ams_status, ams_filament_change ? 1 : 0,
-               ams_change_active ? 1 : 0,
-               new_hw_switch_state, new_tray_now, new_tray_tar);
-    }
-
     runtime.connection = PrinterConnectionState::kOnline;
     const bool payload_download_stage =
         is_download_stage(!resolved_stage.empty() ? resolved_stage : stage_name,
@@ -1744,6 +1739,10 @@ void PrinterClient::handle_report_payload(const char* payload, size_t length) {
     runtime.chamber_temp_c = extract_chamber_temperature_c(print, runtime.chamber_temp_c);
     runtime.current_layer = extract_current_layer_local(print, runtime.current_layer);
     runtime.total_layers = extract_total_layers_local(print, runtime.total_layers);
+    const uint32_t remaining_seconds = extract_remaining_seconds(print);
+    if (remaining_seconds > 0U) {
+      runtime.remaining_seconds = remaining_seconds;
+    }
     runtime.local_model = detect_printer_model_from_payload(print, runtime.local_model);
     runtime.chamber_light_supported =
         runtime.chamber_light_supported || printer_model_has_chamber_light(runtime.local_model);
@@ -2001,11 +2000,6 @@ void PrinterClient::handle_report_payload(const char* payload, size_t length) {
       }
     }
 
-    const uint32_t remaining_seconds = extract_remaining_seconds(print);
-    if (remaining_seconds > 0U) {
-      runtime.remaining_seconds = remaining_seconds;
-    }
-
     const std::string previous_preview_hint = preview_hint_for(text_string(runtime.gcode_file));
     const std::string gcode_file = json_string(print, "gcode_file", text_string(runtime.gcode_file));
     if (!gcode_file.empty()) {
@@ -2047,6 +2041,37 @@ void PrinterClient::handle_report_payload(const char* payload, size_t length) {
                     ? previous_raw_stage : "");
     } else {
       copy_text(&runtime.raw_stage, previous_raw_stage);
+    }
+    const bool metric_changed =
+        has_progress_update ||
+        runtime.current_layer != previous_current_layer ||
+        runtime.total_layers != previous_total_layers ||
+        !same_temperature_c(runtime.nozzle_temp_c, previous_nozzle_temp_c) ||
+        !same_temperature_c(runtime.bed_temp_c, previous_bed_temp_c) ||
+        runtime.remaining_seconds != previous_remaining_seconds;
+    const bool active_metric_hint =
+        (runtime.progress_percent > 0.0f && runtime.progress_percent < 100.0f) ||
+        runtime.current_layer > 0U || runtime.remaining_seconds > 0U;
+    const bool idle_status_with_active_metrics =
+        effective_gcode_state == "IDLE" && active_metric_hint;
+    if ((diag_has_state_fields && diag_has_state_change) || metric_changed ||
+        idle_status_with_active_metrics) {
+      ESP_LOGI(kTag,
+               "[DIAG] local mqtt: gcode=%s stg_cur=%d stage_name=%s ams_status=0x%04X "
+               "ams_change=%d(latch=%d) hw_switch=%d tray_now=%d tray_tar=%d "
+               "progress=%.1f layer=%u/%u nozzle=%.1f bed=%.1f remaining=%u "
+               "idle_metric=%d",
+               gcode_state.empty() ? "(-)" : gcode_state.c_str(), stage_id,
+               stage_name.empty() ? "(-)" : stage_name.c_str(), raw_ams_status,
+               ams_filament_change ? 1 : 0, ams_change_active ? 1 : 0,
+               new_hw_switch_state, new_tray_now, new_tray_tar,
+               static_cast<double>(runtime.progress_percent),
+               static_cast<unsigned>(runtime.current_layer),
+               static_cast<unsigned>(runtime.total_layers),
+               static_cast<double>(runtime.nozzle_temp_c),
+               static_cast<double>(runtime.bed_temp_c),
+               static_cast<unsigned>(runtime.remaining_seconds),
+               idle_status_with_active_metrics ? 1 : 0);
     }
 
     // Refine filament change sub-stage based on hw_switch + tray signals.
@@ -2188,12 +2213,16 @@ void PrinterClient::handle_report_payload(const char* payload, size_t length) {
       const std::string new_stage = text_string(runtime.stage);
       const std::string new_detail = text_string(runtime.detail);
       if (new_raw_status != previous_raw_status || new_raw_stage != previous_raw_stage ||
-          new_stage != previous_stage || new_detail != previous_detail) {
+          new_stage != previous_stage || new_detail != previous_detail || metric_changed) {
         ESP_LOGI(kTag, "[DIAG] local resolved: status=%s raw_stage=%s stage=%s "
-                 "lifecycle=%s detail=%.60s",
+                 "lifecycle=%s progress=%.1f layer=%u/%u remaining=%u detail=%.60s",
                  new_raw_status.c_str(),
                  new_raw_stage.empty() ? "(-)" : new_raw_stage.c_str(),
                  new_stage.c_str(), to_string(runtime.lifecycle),
+                 static_cast<double>(runtime.progress_percent),
+                 static_cast<unsigned>(runtime.current_layer),
+                 static_cast<unsigned>(runtime.total_layers),
+                 static_cast<unsigned>(runtime.remaining_seconds),
                  new_detail.c_str());
       }
     }
