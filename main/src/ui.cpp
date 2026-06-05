@@ -1996,7 +1996,8 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
   detail_visible_ = !detail.empty();
   if (detail_visible_) {
     const lv_label_long_mode_t desired_mode =
-        snapshot.has_error ? LV_LABEL_LONG_SCROLL_CIRCULAR : LV_LABEL_LONG_WRAP;
+        kOnxUiLayout ? LV_LABEL_LONG_DOT :
+        (snapshot.has_error ? LV_LABEL_LONG_SCROLL_CIRCULAR : LV_LABEL_LONG_WRAP);
     if (lv_label_get_long_mode(detail_label_) != desired_mode) {
       lv_label_set_long_mode(detail_label_, desired_mode);
     }
@@ -3107,7 +3108,7 @@ esp_err_t Ui::build_dashboard() {
   lv_obj_set_style_pad_row(pager_, 0, 0);
   enable_touch_bubble(pager_);
   lv_obj_set_flex_flow(pager_, LV_FLEX_FLOW_ROW);
-  lv_obj_set_scroll_dir(pager_, LV_DIR_HOR);
+  lv_obj_set_scroll_dir(pager_, kOnxUiLayout ? LV_DIR_NONE : LV_DIR_HOR);
   // LV_SCROLL_SNAP_NONE: we handle page snapping ourselves in handle_pager_event.
   // LV_SCROLL_SNAP_CENTER would make LVGL launch its own snap animation that conflicts
   // with our set_active_page() call, causing double-animation jitter and page-skip bugs.
@@ -3422,7 +3423,7 @@ esp_err_t Ui::build_dashboard() {
     lv_obj_align(battery_pct_label_, LV_ALIGN_RIGHT_MID, 0, 0);
 
     lv_obj_set_size(badge_slot_, 60, 60);
-    lv_obj_set_pos(badge_slot_, 12, 57);
+    lv_obj_align(badge_slot_, LV_ALIGN_TOP_LEFT, 12, 57);
     lv_obj_set_size(logo_badge_, 60, 60);
     lv_obj_set_style_radius(logo_badge_, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(logo_badge_, lv_color_hex(kOnxColorPanel), 0);
@@ -3442,27 +3443,29 @@ esp_err_t Ui::build_dashboard() {
     lv_obj_set_style_text_font(onx_job_label_, dosis20, 0);
     lv_obj_set_style_text_color(onx_job_label_, lv_color_hex(kOnxColorText), 0);
 
-    lv_obj_set_width(detail_label_, 218);
-    lv_obj_set_pos(detail_label_, 90, 96);
+    lv_obj_set_size(detail_label_, 218, 18);
+    lv_obj_align(detail_label_, LV_ALIGN_TOP_LEFT, 90, 96);
+    lv_label_set_long_mode(detail_label_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_align(detail_label_, LV_TEXT_ALIGN_LEFT, 0);
-    lv_obj_set_style_text_font(detail_label_, info20, 0);
+    lv_obj_set_style_text_font(detail_label_, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(detail_label_, lv_color_hex(kOnxColorMuted), 0);
 
     onx_progress_panel_ = create_onx_panel(page1_, 12, 140, 296, 104, kOnxColorPanel);
     lv_obj_set_parent(progress_label_, onx_progress_panel_);
     lv_obj_set_style_translate_x(progress_label_, 0, 0);
     lv_obj_set_style_translate_y(progress_label_, 0, 0);
-    lv_obj_set_pos(progress_label_, 14, 14);
+    lv_obj_align(progress_label_, LV_ALIGN_TOP_LEFT, 14, 8);
     lv_obj_set_width(progress_label_, 110);
+    lv_obj_set_style_text_font(progress_label_, dosis32, 0);
     lv_obj_set_style_text_align(progress_label_, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_parent(status_label_, onx_progress_panel_);
-    lv_obj_set_pos(status_label_, 130, 18);
+    lv_obj_align(status_label_, LV_ALIGN_TOP_LEFT, 130, 18);
     lv_obj_set_width(status_label_, 152);
     lv_obj_set_style_text_align(status_label_, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_set_style_text_font(status_label_, dosis32, 0);
+    lv_obj_set_style_text_font(status_label_, dosis20, 0);
     onx_progress_bar_ = lv_bar_create(onx_progress_panel_);
-    lv_obj_set_pos(onx_progress_bar_, 12, 74);
-    lv_obj_set_size(onx_progress_bar_, 272, 12);
+    lv_obj_set_pos(onx_progress_bar_, 12, 84);
+    lv_obj_set_size(onx_progress_bar_, 272, 10);
     lv_bar_set_range(onx_progress_bar_, 0, 100);
     lv_bar_set_value(onx_progress_bar_, 0, LV_ANIM_OFF);
     lv_obj_set_style_radius(onx_progress_bar_, 6, LV_PART_MAIN);
@@ -3475,47 +3478,52 @@ esp_err_t Ui::build_dashboard() {
     onx_bed_card_ = create_onx_panel(page1_, 165, 258, 143, 66, kOnxColorPanel2);
     onx_layer_card_ = create_onx_panel(page1_, 12, 334, 143, 66, kOnxColorPanel2);
     onx_detail_card_ = create_onx_panel(page1_, 165, 334, 143, 66, kOnxColorPanel2);
-    create_onx_caption(onx_nozzle_card_, "Nozzle", 10, 8, 123, info20);
-    create_onx_caption(onx_bed_card_, "Bed", 10, 8, 123, info20);
-    create_onx_caption(onx_layer_card_, "Layer", 10, 8, 123, info20);
-    create_onx_caption(onx_detail_card_, "Detail", 10, 8, 123, info20);
+    create_onx_caption(onx_nozzle_card_, "Nozzle", 10, 8, 123, &lv_font_montserrat_14);
+    create_onx_caption(onx_bed_card_, "Bed", 10, 8, 123, &lv_font_montserrat_14);
+    create_onx_caption(onx_layer_card_, "Layer", 10, 8, 123, &lv_font_montserrat_14);
+    create_onx_caption(onx_detail_card_, "Detail", 10, 8, 123, &lv_font_montserrat_14);
 
     lv_obj_set_parent(nozzle_value_label_, onx_nozzle_card_);
-    lv_obj_set_pos(nozzle_value_label_, 10, 30);
-    lv_obj_set_width(nozzle_value_label_, 123);
+    lv_obj_align(nozzle_value_label_, LV_ALIGN_TOP_LEFT, 10, 32);
+    lv_obj_set_size(nozzle_value_label_, 123, 24);
+    lv_label_set_long_mode(nozzle_value_label_, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_font(nozzle_value_label_, dosis20, 0);
     lv_obj_set_style_text_align(nozzle_value_label_, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_parent(nozzle_aux_label_, onx_nozzle_card_);
-    lv_obj_set_pos(nozzle_aux_label_, 74, 11);
+    lv_obj_align(nozzle_aux_label_, LV_ALIGN_TOP_LEFT, 74, 11);
     lv_obj_set_width(nozzle_aux_label_, 58);
     lv_obj_set_style_text_align(nozzle_aux_label_, LV_TEXT_ALIGN_RIGHT, 0);
     set_hidden(nozzle_prefix_label_, true);
 
     lv_obj_set_parent(bed_value_label_, onx_bed_card_);
-    lv_obj_set_pos(bed_value_label_, 10, 30);
-    lv_obj_set_width(bed_value_label_, 123);
+    lv_obj_align(bed_value_label_, LV_ALIGN_TOP_LEFT, 10, 32);
+    lv_obj_set_size(bed_value_label_, 123, 24);
+    lv_label_set_long_mode(bed_value_label_, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_font(bed_value_label_, dosis20, 0);
     lv_obj_set_style_text_align(bed_value_label_, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_parent(bed_aux_label_, onx_bed_card_);
-    lv_obj_set_pos(bed_aux_label_, 46, 11);
+    lv_obj_align(bed_aux_label_, LV_ALIGN_TOP_LEFT, 46, 11);
     lv_obj_set_width(bed_aux_label_, 88);
     lv_obj_set_style_text_align(bed_aux_label_, LV_TEXT_ALIGN_RIGHT, 0);
     set_hidden(bed_prefix_label_, true);
 
     lv_obj_set_parent(layer_label_, onx_layer_card_);
-    lv_obj_set_pos(layer_label_, 10, 30);
-    lv_obj_set_width(layer_label_, 123);
+    lv_obj_align(layer_label_, LV_ALIGN_TOP_LEFT, 10, 32);
+    lv_obj_set_size(layer_label_, 123, 24);
+    lv_label_set_long_mode(layer_label_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(layer_label_, dosis20, 0);
     lv_obj_set_style_text_align(layer_label_, LV_TEXT_ALIGN_LEFT, 0);
 
     onx_metric_detail_label_ = lv_label_create(onx_detail_card_);
     set_label_text_if_changed(onx_metric_detail_label_, "Waiting");
-    lv_obj_set_pos(onx_metric_detail_label_, 10, 30);
-    lv_obj_set_width(onx_metric_detail_label_, 123);
+    lv_obj_align(onx_metric_detail_label_, LV_ALIGN_TOP_LEFT, 10, 32);
+    lv_obj_set_size(onx_metric_detail_label_, 123, 24);
     lv_label_set_long_mode(onx_metric_detail_label_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(onx_metric_detail_label_, dosis20, 0);
     lv_obj_set_style_text_color(onx_metric_detail_label_, lv_color_hex(kOnxColorSoft), 0);
 
     lv_obj_set_size(remaining_row_, 296, 48);
-    lv_obj_set_pos(remaining_row_, 12, 412);
+    lv_obj_align(remaining_row_, LV_ALIGN_TOP_LEFT, 12, 412);
     lv_obj_set_style_bg_color(remaining_row_, lv_color_hex(kOnxColorPanel), 0);
     lv_obj_set_style_bg_opa(remaining_row_, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(remaining_row_, lv_color_hex(kOnxColorLine), 0);
@@ -3526,9 +3534,11 @@ esp_err_t Ui::build_dashboard() {
     lv_obj_set_style_pad_column(remaining_row_, 8, 0);
     lv_obj_set_style_text_color(remaining_label_, lv_color_hex(kOnxColorCyan), 0);
 
-    lv_obj_set_width(portal_hint_label_, 296);
-    lv_obj_set_pos(portal_hint_label_, 12, 462);
+    lv_obj_set_size(portal_hint_label_, 296, 16);
+    lv_label_set_long_mode(portal_hint_label_, LV_LABEL_LONG_DOT);
+    lv_obj_align(portal_hint_label_, LV_ALIGN_TOP_LEFT, 12, 462);
     lv_obj_set_style_text_align(portal_hint_label_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_font(portal_hint_label_, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(portal_hint_label_, lv_color_hex(kOnxColorMuted), 0);
   }
 
@@ -4006,7 +4016,9 @@ void Ui::set_active_page(int page) {
     // lv_obj_scroll_to_view can leave a small residual offset depending on
     // scroll direction.  Use the page's exact x-position for a pixel-perfect snap.
     const int target_x = lv_obj_get_x(target_page);
+    pager_snap_in_progress_ = true;
     lv_obj_scroll_to_x(pager_, target_x, LV_ANIM_OFF);
+    pager_snap_in_progress_ = false;
   }
   active_page_ = clamped_page;
   if (clamped_page == 0 && previous_page != 0) {
@@ -4026,13 +4038,22 @@ void Ui::set_active_page(int page) {
   }
 }
 
+void Ui::schedule_pager_snap(int page) {
+  pending_pager_snap_page_ = clamp_enabled_page(page);
+  if (pager_snap_timer_ != nullptr) {
+    lv_timer_delete(pager_snap_timer_);
+    pager_snap_timer_ = nullptr;
+  }
+  pager_snap_timer_ = lv_timer_create(&Ui::pager_snap_timer_cb, 1, this);
+}
+
 void Ui::set_pager_scroll_locked(bool locked) {
   if (pager_ == nullptr || pager_scroll_locked_ == locked) {
     return;
   }
 
   pager_scroll_locked_ = locked;
-  lv_obj_set_scroll_dir(pager_, locked ? LV_DIR_NONE : LV_DIR_HOR);
+  lv_obj_set_scroll_dir(pager_, (locked || kOnxUiLayout) ? LV_DIR_NONE : LV_DIR_HOR);
 
   if (!locked) {
     return;
@@ -4054,7 +4075,7 @@ void Ui::set_pager_scroll_locked(bool locked) {
 void Ui::handle_pager_event(lv_event_t* event) {
   const lv_event_code_t code = lv_event_get_code(event);
 
-  if (pager_scroll_locked_) {
+  if (pager_scroll_locked_ || pager_snap_in_progress_) {
     return;
   }
 
@@ -4080,7 +4101,7 @@ void Ui::handle_pager_event(lv_event_t* event) {
   }
 
   (void)scroll_x;
-  set_active_page(nearest_enabled_page_for_scroll());
+  schedule_pager_snap(nearest_enabled_page_for_scroll());
 }
 
 void Ui::handle_screen_event(lv_event_t* event) {
@@ -4144,6 +4165,10 @@ void Ui::handle_screen_event(lv_event_t* event) {
 
       if (horizontal_swipe) {
         swipe_switched_ = true;
+        if (kOnxUiLayout) {
+          const int direction = dx < 0 ? 1 : -1;
+          schedule_pager_snap(next_enabled_page(active_page_, direction));
+        }
         return;
       }
       if (!vertical_brightness) {
@@ -4212,6 +4237,11 @@ void Ui::update_portal_access_visuals_locked() {
                          (portal_hint_has_priority || !detail_visible_);
   set_hidden(portal_hint_label_, !show_hint);
   if (show_hint) {
+    if (kOnxUiLayout) {
+      lv_obj_set_size(portal_hint_label_, 296, 16);
+      lv_label_set_long_mode(portal_hint_label_, LV_LABEL_LONG_DOT);
+      lv_obj_align(portal_hint_label_, LV_ALIGN_TOP_LEFT, 12, 462);
+    }
     set_label_text_if_changed(portal_hint_label_, portal_hint_text_);
     set_hidden(detail_label_, true);
   } else if (detail_label_ != nullptr && show_page1 && detail_visible_) {
@@ -4372,6 +4402,25 @@ void Ui::pager_event_cb(lv_event_t* event) {
   auto* ui = static_cast<Ui*>(lv_event_get_user_data(event));
   if (ui != nullptr) {
     ui->handle_pager_event(event);
+  }
+}
+
+void Ui::pager_snap_timer_cb(lv_timer_t* timer) {
+  auto* ui = static_cast<Ui*>(lv_timer_get_user_data(timer));
+  if (ui == nullptr) {
+    lv_timer_delete(timer);
+    return;
+  }
+
+  const int page = ui->pending_pager_snap_page_;
+  ui->pending_pager_snap_page_ = -1;
+  if (ui->pager_snap_timer_ == timer) {
+    ui->pager_snap_timer_ = nullptr;
+  }
+  lv_timer_delete(timer);
+
+  if (page >= 0) {
+    ui->set_active_page(page);
   }
 }
 

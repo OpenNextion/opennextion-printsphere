@@ -88,6 +88,7 @@ class Ui {
   void apply_brightness_policy();
   void set_pager_scroll_locked(bool locked);
   void set_active_page(int page);
+  void schedule_pager_snap(int page);
   int clamp_enabled_page(int page) const;
   int next_enabled_page(int page, int direction) const;
   int nearest_enabled_page_for_scroll() const;
@@ -112,6 +113,7 @@ class Ui {
   static void ams_error_pulse_timer_cb(lv_timer_t* timer);
   void apply_ams_error_pulse_locked();
   static void pulse_anim_exec_cb(void* var, int32_t scale);
+  static void pager_snap_timer_cb(lv_timer_t* timer);
   static void pager_event_cb(lv_event_t* event);
   static void screen_event_cb(lv_event_t* event);
   static void logo_event_cb(lv_event_t* event);
@@ -235,6 +237,7 @@ class Ui {
   lv_obj_t* portal_overlay_value_ = nullptr;
   lv_obj_t* portal_overlay_detail_ = nullptr;
   lv_timer_t* ring_anim_timer_ = nullptr;  // unused, ambient sweep timer removed
+  lv_timer_t* pager_snap_timer_ = nullptr;
   int user_brightness_percent_ = 80;
   int applied_brightness_percent_ = -1;
   bool gesture_active_ = false;
@@ -255,6 +258,8 @@ class Ui {
   bool ring_animation_active_ = false;
   bool swipe_switched_ = false;
   bool pager_scroll_locked_ = false;
+  bool pager_snap_in_progress_ = false;
+  int pending_pager_snap_page_ = -1;
   // Toggled by tapping the remaining-time row on page1: when true the row
   // shows the predicted finish wall-clock time instead of the remaining
   // duration. The clock-icon prefix is hidden in ETA mode to make room.
