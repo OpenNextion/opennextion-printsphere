@@ -1637,6 +1637,7 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
     }
 
     lv_obj_add_flag(card, LV_OBJ_FLAG_CLICKABLE);
+    enable_touch_bubble(card);
     lv_obj_add_event_cb(card, &Ui::printer_card_click_cb, LV_EVENT_CLICKED, this);
 
     // Status dot — small colored circle in top-right
@@ -2238,8 +2239,9 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
     if (kOnxUiLayout) {
       if (has_camera_image) {
         lv_obj_set_pos(page3_note_, 12, 48);
-        lv_obj_set_size(page3_note_, 180, 24);
+        lv_obj_set_size(page3_note_, 180, 30);
         lv_obj_set_width(page3_note_, 180);
+        lv_label_set_long_mode(page3_note_, LV_LABEL_LONG_DOT);
         lv_obj_set_style_text_align(page3_note_, LV_TEXT_ALIGN_LEFT, 0);
         lv_obj_set_style_bg_color(page3_note_, lv_color_hex(kOnxColorPanel), 0);
         lv_obj_set_style_bg_opa(page3_note_, LV_OPA_COVER, 0);
@@ -2248,11 +2250,12 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
         lv_obj_set_style_border_width(page3_note_, 1, 0);
         lv_obj_set_style_radius(page3_note_, 12, 0);
         lv_obj_set_style_pad_hor(page3_note_, 10, 0);
-        lv_obj_set_style_pad_ver(page3_note_, 4, 0);
+        lv_obj_set_style_pad_ver(page3_note_, 2, 0);
       } else {
         lv_obj_set_pos(page3_note_, 30, 154);
         lv_obj_set_size(page3_note_, 260, 48);
         lv_obj_set_width(page3_note_, 260);
+        lv_label_set_long_mode(page3_note_, LV_LABEL_LONG_WRAP);
         lv_obj_set_style_text_align(page3_note_, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_set_style_bg_opa(page3_note_, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_opa(page3_note_, LV_OPA_TRANSP, 0);
@@ -3186,6 +3189,7 @@ esp_err_t Ui::build_dashboard() {
   lv_obj_set_style_pad_all(page0_card_list_, 0, 0);
   lv_obj_set_scroll_dir(page0_card_list_, LV_DIR_VER);
   lv_obj_set_scrollbar_mode(page0_card_list_, LV_SCROLLBAR_MODE_OFF);
+  enable_touch_bubble(page0_card_list_);
 
   page0_empty_note_ = lv_label_create(page0_);
   set_label_text_if_changed(page0_empty_note_, "No printers configured.\nUse the web portal to add printers.");
