@@ -226,6 +226,7 @@ class Ui {
   lv_obj_t* remaining_row_ = nullptr;
   lv_obj_t* brightness_overlay_ = nullptr;
   lv_obj_t* page2_shell_ = nullptr;
+  lv_obj_t* page2_info_panel_ = nullptr;
   lv_obj_t* page2_image_ = nullptr;
   lv_obj_t* page2_note_ = nullptr;
   lv_obj_t* page2_subnote_ = nullptr;
