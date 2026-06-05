@@ -256,6 +256,77 @@ Current LVGL touch validation status:
 - The accepted LVGL touch transform remains `swap_xy=0`, `mirror_x=0`, and
   `mirror_y=0`.
 
+## Landscape Orientation Probe
+
+Portrait remains the accepted stable ONX path for PrintSphere:
+
+- Panel init `MADCTL=0x48` (`MX|BGR`).
+- `COLMOD=0x55`.
+- Final `INVOFF`.
+- RGB565 payload byte swap at the BSP transport boundary.
+- Touch transform `swap_xy=0`, `mirror_x=0`, `mirror_y=0`.
+
+Landscape support is not accepted yet. The BSP hardware thread uses
+`examples/onx_bsp_orientation_probe` as a direct-panel validation firmware
+before any PrintSphere UI landscape layout work.
+
+The probe does not change the default BSP portrait init constants. It
+temporarily writes `MADCTL` at runtime for four landscape scan candidates:
+
+- `LANDSCAPE MV 28`: `MADCTL=0x28` (`MV|BGR`), logical display `480x320`.
+  Touch mapping under test: `mapped_x=raw_y`, `mapped_y=raw_x`.
+- `LANDSCAPE MX MV 68`: `MADCTL=0x68` (`MX|MV|BGR`), logical display
+  `480x320`. Touch mapping under test: `mapped_x=raw_y`,
+  `mapped_y=319-raw_x`.
+- `LANDSCAPE MY MV A8`: `MADCTL=0xA8` (`MY|MV|BGR`), logical display
+  `480x320`. Touch mapping under test: `mapped_x=479-raw_y`,
+  `mapped_y=raw_x`.
+- `LANDSCAPE MX MY MV E8`: `MADCTL=0xE8` (`MX|MY|MV|BGR`), logical display
+  `480x320`. Touch mapping under test: `mapped_x=479-raw_y`,
+  `mapped_y=319-raw_x`.
+
+The validation screen displays `TOP`, `BOTTOM`, `LEFT`, `RIGHT`, and touch
+targets for `TAP TOP LEFT`, `TAP TOP RIGHT`, `TAP BOTTOM LEFT`,
+`TAP BOTTOM RIGHT`, and `TAP CENTER`. Serial logs must include raw CST826
+coordinates, mapped landscape coordinates, the inferred target, and the active
+transform. These logs are used to decide whether one landscape direction can
+move to UI design work or whether a single touch transform bit (`swap_xy`,
+`mirror_x`, or `mirror_y`) must be tested next.
+
+Landscape probe evidence so far:
+
+- `LANDSCAPE MX MV 68` (`MADCTL=0x68`) was built, flashed through the standard
+  flow, and captured with touch logs. Touch mapping for five visible target
+  taps was internally consistent, but the user reported the displayed font was
+  mirrored. Therefore `0x68` is not accepted as the final landscape display
+  scan state.
+- The next probe firmware keeps the same direct draw path and RGB565 byte swap
+  but cycles all four `MV` landscape `MADCTL` mirror combinations. This is a
+  hardware scan-state diagnostic, not a UI text mirroring workaround.
+- Four-candidate probe build/flash evidence: `examples/onx_bsp_orientation_probe`
+  built successfully with binary size `0x3bd10`, then flashed through the
+  standard flow on 2026-06-05 using `/dev/tty.wchusbserial10`, `115200`, and
+  `write-flash @flash_args`; esptool verified the written bootloader,
+  partition-table, and app hashes and hard reset the board. Runtime capture
+  confirmed candidate page transitions for `0xE8`, `0x28`, `0x68`, and `0xA8`.
+  No touch press lines were captured in that 140 second window. Visual selection
+  of the non-mirrored landscape scan state is still pending.
+- Re-run visual result: the user selected `LANDSCAPE MX MY MV E8` as the
+  landscape candidate to keep evaluating. A 150 second runtime capture showed
+  `MADCTL=0xE8` page readiness and touch logs mapping the visible five-target
+  set consistently:
+  - Bottom-left tap: raw `(64,424)` mapped to `(55,255)`, target
+    `BOTTOM LEFT`.
+  - Bottom-right tap: raw `(70,88)` mapped to `(391,249)`, target
+    `BOTTOM RIGHT`.
+  - Center tap: raw `(183,249)` mapped to `(230,136)`, target `CENTER`.
+  - Top-left tap: raw `(272,401)` mapped to `(78,47)`, target `TOP LEFT`.
+  - Top-right tap: raw `(280,85)` mapped to `(394,39)`, target `TOP RIGHT`.
+  This makes the current low-level landscape candidate
+  `MADCTL=0xE8` (`MX|MY|MV|BGR`) with touch transform
+  `mapped_x=479-raw_y`, `mapped_y=319-raw_x`. This is a BSP hardware-probe
+  result only; PrintSphere UI layout has not been changed for landscape.
+
 ## Official ONX Source Comparison
 
 Reference sources:
