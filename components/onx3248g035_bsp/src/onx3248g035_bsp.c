@@ -40,12 +40,16 @@ static const char *TAG = "onx_bsp";
 #define RGB565_YELLOW 0xFFE0
 
 /*
- * Recovery Candidate A: restore the historically visible MX+BGR controller
- * state while keeping the panel-wrapper RGB565 byte-order conversion and DMA
- * queue drain. This isolates whether the current blank LVGL screen is tied to
- * MADCTL=0x08.
+ * Portrait remains the default stable PrintSphere path. The landscape profile
+ * uses the user-accepted orientation probe result: MADCTL=0xE8.
  */
+#if defined(PRINTSPHERE_ONX_ORIENTATION_LANDSCAPE) && PRINTSPHERE_ONX_ORIENTATION_LANDSCAPE
+#define ONX_LCD_MADCTL_VALUE (LCD_CMD_MX_BIT | LCD_CMD_MY_BIT | LCD_CMD_MV_BIT | LCD_CMD_BGR_BIT)
+#define ONX_LCD_ORIENTATION_LABEL "landscape"
+#else
 #define ONX_LCD_MADCTL_VALUE (LCD_CMD_MX_BIT | LCD_CMD_BGR_BIT)
+#define ONX_LCD_ORIENTATION_LABEL "portrait"
+#endif
 #define ONX_LCD_COLMOD_VALUE 0x55
 #define ONX_LCD_INVERT_CMD LCD_CMD_INVOFF
 
@@ -285,8 +289,9 @@ esp_err_t onx_bsp_lcd_init(void)
     ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)ONX_LCD_HOST, &io_config, &s_lcd_io), TAG, "LCD IO init failed");
     ESP_RETURN_ON_ERROR(lcd_send_cmds(), TAG, "ST7796 init sequence failed");
     s_lcd_ready = true;
-    ESP_LOGI(TAG, "LCD init complete: ST7796 SPI %dx%d pclk=%d madctl=0x%02X colmod=0x%02X invert=off rgb565=byte_swap",
-             ONX_LCD_H_RES, ONX_LCD_V_RES, ONX_LCD_PCLK_HZ, ONX_LCD_MADCTL_VALUE, ONX_LCD_COLMOD_VALUE);
+    ESP_LOGI(TAG, "LCD init complete: ST7796 SPI %dx%d orientation=%s pclk=%d madctl=0x%02X colmod=0x%02X invert=off rgb565=byte_swap",
+             ONX_LCD_H_RES, ONX_LCD_V_RES, ONX_LCD_ORIENTATION_LABEL, ONX_LCD_PCLK_HZ,
+             ONX_LCD_MADCTL_VALUE, ONX_LCD_COLMOD_VALUE);
     return ESP_OK;
 }
 

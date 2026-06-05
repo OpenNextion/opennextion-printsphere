@@ -12,6 +12,11 @@ set_property(CACHE PRINTSPHERE_BOARD PROPERTY STRINGS
     waveshare_amoled_1_75
     onx3248g035
 )
+set(PRINTSPHERE_ONX_ORIENTATION "portrait" CACHE STRING "ONX3248G035 display orientation")
+set_property(CACHE PRINTSPHERE_ONX_ORIENTATION PROPERTY STRINGS
+    portrait
+    landscape
+)
 
 if(PRINTSPHERE_BOARD STREQUAL "waveshare_amoled_1_75")
     set(COMPONENTS
@@ -20,6 +25,10 @@ if(PRINTSPHERE_BOARD STREQUAL "waveshare_amoled_1_75")
         esp32_s3_touch_amoled_1_75
     )
 elseif(PRINTSPHERE_BOARD STREQUAL "onx3248g035")
+    if(NOT PRINTSPHERE_ONX_ORIENTATION STREQUAL "portrait" AND
+       NOT PRINTSPHERE_ONX_ORIENTATION STREQUAL "landscape")
+        message(FATAL_ERROR "Unsupported PRINTSPHERE_ONX_ORIENTATION=${PRINTSPHERE_ONX_ORIENTATION}")
+    endif()
     set(COMPONENTS
         main
         onx3248g035_bsp
@@ -30,6 +39,10 @@ endif()
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 idf_build_set_property(PRINTSPHERE_BOARD "${PRINTSPHERE_BOARD}")
+idf_build_set_property(PRINTSPHERE_ONX_ORIENTATION "${PRINTSPHERE_ONX_ORIENTATION}")
+if(PRINTSPHERE_BOARD STREQUAL "onx3248g035")
+    message(STATUS "PrintSphere ONX orientation: ${PRINTSPHERE_ONX_ORIENTATION}")
+endif()
 project(printsphere_idf)
 
 if(IDF_VERSION_MAJOR EQUAL 6 AND IDF_VERSION_MINOR EQUAL 0 AND IDF_VERSION_PATCH EQUAL 1)

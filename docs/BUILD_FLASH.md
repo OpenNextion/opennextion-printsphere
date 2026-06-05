@@ -184,6 +184,31 @@ export IDF_TOOLS_PATH="$PWD/.tools/espressif"
 idf.py build
 ```
 
+Standard ONX portrait app build:
+
+```sh
+cd /Users/alex/Documents/codex_project/Nextion_project_PrintSphere
+export IDF_TOOLS_PATH="$PWD/.tools/espressif"
+. "$PWD/.tools/esp-idf-v6.0.1/export.sh"
+idf.py -DPRINTSPHERE_BOARD=onx3248g035 -DPRINTSPHERE_ONX_ORIENTATION=portrait build
+```
+
+ONX landscape app build uses the same board profile with an explicit
+orientation profile. This build selects the `480 x 320` UI canvas, ST7796
+`MADCTL=0xE8`, and the matching CST826 touch transform:
+
+```sh
+cd /Users/alex/Documents/codex_project/Nextion_project_PrintSphere
+export IDF_TOOLS_PATH="$PWD/.tools/espressif"
+. "$PWD/.tools/esp-idf-v6.0.1/export.sh"
+idf.py -DPRINTSPHERE_BOARD=onx3248g035 -DPRINTSPHERE_ONX_ORIENTATION=landscape build
+```
+
+Always pass the orientation explicitly when switching between portrait and
+landscape in the same checkout. CMake caches cache-string options inside the
+current build directory, so relying on the implicit default after a previous
+landscape build can reuse the cached landscape value.
+
 For the ONX BSP smoke project, Component Manager must be disabled because the
 project uses only ESP-IDF components plus the local ONX BSP component:
 

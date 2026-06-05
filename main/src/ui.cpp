@@ -82,13 +82,21 @@ constexpr bool kOnxUiLayout = true;
 #else
 constexpr bool kOnxUiLayout = false;
 #endif
+#if defined(PRINTSPHERE_ONX_ORIENTATION_LANDSCAPE) && PRINTSPHERE_ONX_ORIENTATION_LANDSCAPE
+constexpr bool kOnxLandscapeLayout = true;
+#else
+constexpr bool kOnxLandscapeLayout = false;
+#endif
 
 constexpr int kOnxPagePad = 12;
-constexpr int kOnxContentWidth = 296;
-constexpr int kOnxTopbarY = 12;
-constexpr int kOnxTopbarHeight = 30;
-constexpr int kOnxBottomHintY = 432;
-constexpr int kOnxBottomHintHeight = 36;
+constexpr int kOnxContentWidth = kOnxLandscapeLayout ? 456 : 296;
+constexpr int kOnxTopbarY = kOnxLandscapeLayout ? 10 : 12;
+constexpr int kOnxTopbarHeight = kOnxLandscapeLayout ? 28 : 30;
+constexpr int kOnxBottomHintY = kOnxLandscapeLayout ? 292 : 432;
+constexpr int kOnxBottomHintHeight = kOnxLandscapeLayout ? 20 : 36;
+constexpr int kOnxPreviewImageSize = kOnxLandscapeLayout ? 240 : 296;
+constexpr int kOnxCameraImageWidth = kOnxLandscapeLayout ? 300 : 296;
+constexpr int kOnxCameraImageHeight = kOnxLandscapeLayout ? 224 : 166;
 constexpr uint32_t kOnxColorBg = 0x050607;
 constexpr uint32_t kOnxColorPanel = 0x111418;
 constexpr uint32_t kOnxColorPanel2 = 0x171B20;
@@ -483,7 +491,7 @@ void add_onx_page_chrome(lv_obj_t* page,
 
   lv_obj_t* title_label = lv_label_create(topbar);
   set_label_text_if_changed(title_label, title);
-  lv_obj_set_width(title_label, 220);
+  lv_obj_set_width(title_label, kOnxLandscapeLayout ? 260 : 220);
   lv_label_set_long_mode(title_label, LV_LABEL_LONG_DOT);
   lv_obj_set_style_text_font(title_label, title_font, 0);
   lv_obj_set_style_text_color(title_label, lv_color_hex(kOnxColorText), 0);
@@ -492,7 +500,7 @@ void add_onx_page_chrome(lv_obj_t* page,
 
   lv_obj_t* meta_label = lv_label_create(topbar);
   set_label_text_if_changed(meta_label, meta);
-  lv_obj_set_width(meta_label, 68);
+  lv_obj_set_width(meta_label, kOnxLandscapeLayout ? 176 : 68);
   lv_label_set_long_mode(meta_label, LV_LABEL_LONG_DOT);
   lv_obj_set_style_text_font(meta_label, hint_font, 0);
   lv_obj_set_style_text_color(meta_label, lv_color_hex(kOnxColorMuted), 0);
@@ -504,15 +512,17 @@ void add_onx_page_chrome(lv_obj_t* page,
   }
 
   const bool cover_page = std::strcmp(title, "Cover") == 0;
+  const int hint_y = kOnxLandscapeLayout ? kOnxBottomHintY : (cover_page ? 448 : kOnxBottomHintY);
+  const int hint_h = kOnxLandscapeLayout ? kOnxBottomHintHeight : (cover_page ? 20 : kOnxBottomHintHeight);
   lv_obj_t* hint_line = lv_obj_create(page);
-  lv_obj_set_pos(hint_line, kOnxPagePad, cover_page ? 448 : kOnxBottomHintY);
-  lv_obj_set_size(hint_line, kOnxContentWidth, cover_page ? 20 : kOnxBottomHintHeight);
+  lv_obj_set_pos(hint_line, kOnxPagePad, hint_y);
+  lv_obj_set_size(hint_line, kOnxContentWidth, hint_h);
   make_transparent(hint_line);
   lv_obj_set_style_border_color(hint_line, lv_color_hex(kOnxColorLine), 0);
   lv_obj_set_style_border_opa(hint_line, LV_OPA_COVER, 0);
   lv_obj_set_style_border_width(hint_line, 1, 0);
   lv_obj_set_style_border_side(hint_line, LV_BORDER_SIDE_TOP, 0);
-  lv_obj_set_style_pad_top(hint_line, cover_page ? 0 : 8, 0);
+  lv_obj_set_style_pad_top(hint_line, (cover_page || kOnxLandscapeLayout) ? 0 : 8, 0);
   lv_obj_clear_flag(hint_line, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_clear_flag(hint_line, LV_OBJ_FLAG_CLICKABLE);
   enable_touch_bubble(hint_line);
@@ -3609,14 +3619,15 @@ esp_err_t Ui::build_dashboard() {
   lv_obj_set_style_text_color(portal_overlay_detail_, lv_color_hex(0xCBD5E1), 0);
 
   if (kOnxUiLayout) {
-    page2_shell_ = create_onx_panel(page2_, 12, 60, 296, 296, kOnxColorPanel);
+    page2_shell_ = create_onx_panel(page2_, 12, 60, kOnxPreviewImageSize, kOnxPreviewImageSize,
+                                    kOnxColorPanel);
   } else {
     page2_shell_ = nullptr;
   }
 
   page2_image_ = lv_image_create(page2_);
-  lv_obj_set_size(page2_image_, kOnxUiLayout ? 296 : kPage2PreviewSize,
-                  kOnxUiLayout ? 296 : kPage2PreviewSize);
+  lv_obj_set_size(page2_image_, kOnxUiLayout ? kOnxPreviewImageSize : kPage2PreviewSize,
+                  kOnxUiLayout ? kOnxPreviewImageSize : kPage2PreviewSize);
   lv_image_set_inner_align(page2_image_, LV_IMAGE_ALIGN_CONTAIN);
   if (kOnxUiLayout) {
     lv_obj_set_pos(page2_image_, 12, 60);
@@ -3678,7 +3689,8 @@ esp_err_t Ui::build_dashboard() {
   }
 
   if (kOnxUiLayout) {
-    page3_shell_ = create_onx_panel(page3_, 12, 86, 296, 166, kOnxColorPanel);
+    page3_shell_ = create_onx_panel(page3_, 12, 86, kOnxCameraImageWidth, kOnxCameraImageHeight,
+                                    kOnxColorPanel);
     page3_info_panel_ = lv_obj_create(page3_);
     lv_obj_set_pos(page3_info_panel_, 12, 270);
     lv_obj_set_size(page3_info_panel_, 296, 120);
@@ -3692,8 +3704,8 @@ esp_err_t Ui::build_dashboard() {
   }
 
   page3_image_ = lv_image_create(page3_);
-  lv_obj_set_size(page3_image_, kOnxUiLayout ? 296 : board::kDisplayWidth,
-                  kOnxUiLayout ? 166 : kPage3CameraHeight);
+  lv_obj_set_size(page3_image_, kOnxUiLayout ? kOnxCameraImageWidth : board::kDisplayWidth,
+                  kOnxUiLayout ? kOnxCameraImageHeight : kPage3CameraHeight);
   lv_image_set_inner_align(page3_image_,
                            kOnxUiLayout ? LV_IMAGE_ALIGN_CONTAIN : LV_IMAGE_ALIGN_CENTER);
   if (kOnxUiLayout) {

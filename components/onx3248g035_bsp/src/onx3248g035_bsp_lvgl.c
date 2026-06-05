@@ -129,6 +129,12 @@ static void onx_lvgl_touch_read(lv_indev_t *indev, lv_indev_data_t *data)
     onx_touch_point_t point = {};
     esp_err_t err = onx_bsp_touch_read(&point);
     if (err == ESP_OK && point.points > 0) {
+#if defined(PRINTSPHERE_ONX_ORIENTATION_LANDSCAPE) && PRINTSPHERE_ONX_ORIENTATION_LANDSCAPE
+        const uint16_t raw_x = point.x;
+        const uint16_t raw_y = point.y;
+        point.x = (raw_y >= ONX_LCD_H_RES) ? 0 : (uint16_t)((ONX_LCD_H_RES - 1) - raw_y);
+        point.y = (raw_x >= ONX_LCD_V_RES) ? 0 : (uint16_t)((ONX_LCD_V_RES - 1) - raw_x);
+#endif
         if (point.x >= ONX_LCD_H_RES) {
             point.x = ONX_LCD_H_RES - 1;
         }
@@ -209,14 +215,15 @@ lv_display_t *onx_bsp_lvgl_start(bsp_display_cfg_t *cfg)
 
     if (cfg) {
         if (cfg->rotation != ESP_LV_ADAPTER_ROTATE_0) {
-            ESP_LOGW(TAG, "ONX M3 starts in fixed portrait; cfg rotation=%d ignored", (int)cfg->rotation);
+            ESP_LOGW(TAG, "ONX starts in compile-time display orientation; cfg rotation=%d ignored",
+                     (int)cfg->rotation);
         }
         if (cfg->tear_avoid_mode != ESP_LV_ADAPTER_TEAR_AVOID_MODE_NONE) {
             ESP_LOGW(TAG, "ONX ST7796 path has no TE GPIO; tear_avoid_mode=%d ignored",
                      (int)cfg->tear_avoid_mode);
         }
         if (cfg->touch_flags.swap_xy || cfg->touch_flags.mirror_x || cfg->touch_flags.mirror_y) {
-            ESP_LOGW(TAG, "ONX touch uses verified portrait mapping; cfg touch flags swap=%u mx=%u my=%u ignored",
+            ESP_LOGW(TAG, "ONX touch uses compile-time mapping; cfg touch flags swap=%u mx=%u my=%u ignored",
                      cfg->touch_flags.swap_xy, cfg->touch_flags.mirror_x, cfg->touch_flags.mirror_y);
         }
     }
@@ -247,7 +254,11 @@ lv_display_t *onx_bsp_lvgl_start(bsp_display_cfg_t *cfg)
         ESP_LOGE(TAG, "ONX panel creation failed");
         return NULL;
     }
-    ESP_LOGI(TAG, "ONX LVGL Recovery A: madctl=0x48 mirror_x=0 mirror_y=0 rgb565_swap=panel_wrapper drain=1");
+#if defined(PRINTSPHERE_ONX_ORIENTATION_LANDSCAPE) && PRINTSPHERE_ONX_ORIENTATION_LANDSCAPE
+    ESP_LOGI(TAG, "ONX LVGL orientation: landscape 480x320 madctl=0xE8 touch=x=479-raw_y,y=319-raw_x");
+#else
+    ESP_LOGI(TAG, "ONX LVGL orientation: portrait 320x480 madctl=0x48 touch=raw");
+#endif
 
     err = bsp_display_brightness_init();
     ESP_LOGI(TAG, "LVGL start: brightness init=%s", esp_err_to_name(err));

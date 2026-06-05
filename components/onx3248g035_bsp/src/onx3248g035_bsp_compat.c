@@ -31,7 +31,13 @@ esp_err_t bsp_display_brightness_set(int brightness_percent);
 #define ONX_BSP_HAS_LVGL 0
 #endif
 
-#define ONX_PANEL_RECOVERY_A_MADCTL (LCD_CMD_MX_BIT | LCD_CMD_BGR_BIT)
+#if defined(PRINTSPHERE_ONX_ORIENTATION_LANDSCAPE) && PRINTSPHERE_ONX_ORIENTATION_LANDSCAPE
+#define ONX_PANEL_DEFAULT_MADCTL (LCD_CMD_MX_BIT | LCD_CMD_MY_BIT | LCD_CMD_MV_BIT | LCD_CMD_BGR_BIT)
+#define ONX_PANEL_ORIENTATION_LABEL "landscape"
+#else
+#define ONX_PANEL_DEFAULT_MADCTL (LCD_CMD_MX_BIT | LCD_CMD_BGR_BIT)
+#define ONX_PANEL_ORIENTATION_LABEL "portrait"
+#endif
 
 #if ONX_BSP_HAS_LVGL
 lv_display_t *onx_bsp_lvgl_start(bsp_display_cfg_t *cfg);
@@ -204,10 +210,18 @@ static esp_err_t onx_panel_invert_color(esp_lcd_panel_t *panel, bool invert_colo
 static esp_err_t onx_panel_mirror(esp_lcd_panel_t *panel, bool x_axis, bool y_axis)
 {
     ESP_RETURN_ON_FALSE(panel != NULL, ESP_ERR_INVALID_ARG, TAG, "panel is null");
+#if defined(PRINTSPHERE_ONX_ORIENTATION_LANDSCAPE) && PRINTSPHERE_ONX_ORIENTATION_LANDSCAPE
+    if (x_axis || y_axis) {
+        ESP_LOGW(TAG, "ONX landscape profile uses fixed MADCTL=0x%02X; runtime mirror is not supported",
+                 ONX_PANEL_DEFAULT_MADCTL);
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+#else
     if (y_axis) {
         ESP_LOGW(TAG, "ONX panel mirror_y is not enabled without a dedicated visual validation run");
         return ESP_ERR_NOT_SUPPORTED;
     }
+#endif
 
     onx_lcd_panel_t *onx_panel = __containerof(panel, onx_lcd_panel_t, base);
     uint8_t madctl = onx_panel->madctl;
@@ -228,7 +242,8 @@ static esp_err_t onx_panel_swap_xy(esp_lcd_panel_t *panel, bool swap_axes)
     if (!swap_axes) {
         return ESP_OK;
     }
-    ESP_LOGW(TAG, "ONX M3 panel keeps portrait MV=0");
+    ESP_LOGW(TAG, "ONX panel uses compile-time %s orientation; runtime swap_xy is not supported",
+             ONX_PANEL_ORIENTATION_LABEL);
     return ESP_ERR_NOT_SUPPORTED;
 }
 
@@ -274,7 +289,7 @@ static esp_err_t onx_panel_new(esp_lcd_panel_handle_t *ret_panel, esp_lcd_panel_
         onx_lcd_panel_t *panel = calloc(1, sizeof(onx_lcd_panel_t));
         ESP_RETURN_ON_FALSE(panel != NULL, ESP_ERR_NO_MEM, TAG, "panel allocation failed");
         panel->io = io;
-        panel->madctl = ONX_PANEL_RECOVERY_A_MADCTL;
+        panel->madctl = ONX_PANEL_DEFAULT_MADCTL;
         panel->base.del = onx_panel_del;
         panel->base.reset = onx_panel_reset;
         panel->base.init = onx_panel_init;
@@ -287,7 +302,8 @@ static esp_err_t onx_panel_new(esp_lcd_panel_handle_t *ret_panel, esp_lcd_panel_
         panel->base.disp_sleep = onx_panel_sleep;
         panel->base.set_brightness = onx_panel_set_brightness;
         s_panel_handle = &panel->base;
-        ESP_LOGI(TAG, "ONX esp_lcd_panel_t wrapper ready");
+        ESP_LOGI(TAG, "ONX esp_lcd_panel_t wrapper ready: orientation=%s madctl=0x%02X",
+                 ONX_PANEL_ORIENTATION_LABEL, panel->madctl);
     }
 
     *ret_panel = s_panel_handle;
@@ -337,7 +353,8 @@ esp_err_t bsp_display_brightness_init(void)
 esp_err_t bsp_display_rotation_set(bsp_display_rotation_t rotation)
 {
     if (rotation != BSP_DISPLAY_ROTATE_0) {
-        ESP_LOGW(TAG, "ONX M3 skeleton only supports verified portrait rotation");
+        ESP_LOGW(TAG, "ONX uses compile-time %s orientation; runtime rotation=%d unsupported",
+                 ONX_PANEL_ORIENTATION_LABEL, (int)rotation);
         return ESP_ERR_NOT_SUPPORTED;
     }
 

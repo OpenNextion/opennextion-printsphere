@@ -12,9 +12,14 @@
 #define ESP_LCD_COLOR_FORMAT_RGB888 (2)
 #endif
 
-/* ONX3248G035 ST7796U portrait display definition. */
+/* ONX3248G035 ST7796U compile-time display definition. */
+#if defined(PRINTSPHERE_ONX_ORIENTATION_LANDSCAPE) && PRINTSPHERE_ONX_ORIENTATION_LANDSCAPE
+#define BSP_LCD_H_RES 480
+#define BSP_LCD_V_RES 320
+#else
 #define BSP_LCD_H_RES 320
 #define BSP_LCD_V_RES 480
+#endif
 #define BSP_LCD_COLOR_FORMAT (ESP_LCD_COLOR_FORMAT_RGB565)
 #define BSP_LCD_BIGENDIAN 0
 #define BSP_LCD_BITS_PER_PIXEL 16
