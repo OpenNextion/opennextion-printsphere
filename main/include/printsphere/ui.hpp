@@ -198,6 +198,7 @@ class Ui {
   lv_obj_t* onx_bed_card_ = nullptr;
   lv_obj_t* onx_layer_card_ = nullptr;
   lv_obj_t* onx_detail_card_ = nullptr;
+  lv_obj_t* onx_layer_line_label_ = nullptr;
   lv_obj_t* onx_metric_detail_label_ = nullptr;
   lv_obj_t* status_arc_ = nullptr;
   lv_obj_t* progress_label_ = nullptr;

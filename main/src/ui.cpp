@@ -97,6 +97,10 @@ constexpr int kOnxBottomHintHeight = kOnxLandscapeLayout ? 20 : 36;
 constexpr int kOnxPreviewImageSize = kOnxLandscapeLayout ? 240 : 296;
 constexpr int kOnxCameraImageWidth = kOnxLandscapeLayout ? 300 : 296;
 constexpr int kOnxCameraImageHeight = kOnxLandscapeLayout ? 224 : 166;
+constexpr int kOnxMainLeftPanelX = 12;
+constexpr int kOnxMainLeftPanelY = kOnxLandscapeLayout ? 48 : 140;
+constexpr int kOnxMainLeftPanelW = kOnxLandscapeLayout ? 196 : 296;
+constexpr int kOnxMainLeftPanelH = kOnxLandscapeLayout ? 228 : 104;
 constexpr uint32_t kOnxColorBg = 0x050607;
 constexpr uint32_t kOnxColorPanel = 0x111418;
 constexpr uint32_t kOnxColorPanel2 = 0x171B20;
@@ -2016,16 +2020,28 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
   detail_visible_ = !detail.empty();
   if (detail_visible_) {
     const lv_label_long_mode_t desired_mode =
+        kOnxLandscapeLayout ? LV_LABEL_LONG_WRAP :
         kOnxUiLayout ? LV_LABEL_LONG_DOT :
         (snapshot.has_error ? LV_LABEL_LONG_SCROLL_CIRCULAR : LV_LABEL_LONG_WRAP);
     if (lv_label_get_long_mode(detail_label_) != desired_mode) {
       lv_label_set_long_mode(detail_label_, desired_mode);
+    }
+    if (kOnxLandscapeLayout) {
+      lv_obj_set_style_text_color(detail_label_,
+                                  lv_color_hex(snapshot.has_error ? 0xEF4444 : kOnxColorSoft), 0);
+      lv_obj_set_style_border_color(detail_label_,
+                                    lv_color_hex(snapshot.has_error ? 0xEF4444 : kOnxColorLine), 0);
+      lv_obj_set_style_bg_color(detail_label_,
+                                lv_color_hex(snapshot.has_error ? 0x1A0B0B : kOnxColorPanel), 0);
     }
     set_label_text_if_changed(detail_label_, detail);
   }
 
   const std::string layer = layer_text(snapshot);
   set_label_text_if_changed(layer_label_, layer);
+  if (onx_layer_line_label_ != nullptr) {
+    set_label_text_if_changed(onx_layer_line_label_, layer);
+  }
   if (onx_metric_detail_label_ != nullptr) {
     const std::string metric_detail =
         snapshot.has_error ? "Error" :
@@ -2073,6 +2089,8 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
   nozzle_aux_visible_ = !nozzle_aux.empty();
   if (nozzle_aux_visible_) {
     set_label_text_if_changed(nozzle_aux_label_, nozzle_aux);
+  } else if (kOnxLandscapeLayout) {
+    set_label_text_if_changed(nozzle_aux_label_, "--");
   }
 
   const std::string bed_aux =
@@ -2080,6 +2098,8 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
   bed_aux_visible_ = !bed_aux.empty();
   if (bed_aux_visible_) {
     set_label_text_if_changed(bed_aux_label_, bed_aux);
+  } else if (kOnxLandscapeLayout) {
+    set_label_text_if_changed(bed_aux_label_, "--");
   }
 
   const std::string battery_icon = battery_icon_text(snapshot);
@@ -3424,7 +3444,7 @@ esp_err_t Ui::build_dashboard() {
 
     onx_top_status_label_ = lv_label_create(onx_main_topbar_);
     set_label_text_if_changed(onx_top_status_label_, "--% Waiting");
-    lv_obj_set_width(onx_top_status_label_, 202);
+    lv_obj_set_width(onx_top_status_label_, kOnxLandscapeLayout ? 260 : 202);
     lv_label_set_long_mode(onx_top_status_label_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(onx_top_status_label_, dosis20, 0);
     lv_obj_set_style_text_color(onx_top_status_label_, lv_color_hex(kOnxColorText), 0);
@@ -3438,15 +3458,17 @@ esp_err_t Ui::build_dashboard() {
     lv_obj_set_style_translate_y(battery_pct_label_, 0, 0);
     lv_obj_set_style_text_font(battery_icon_label_, mdi30, 0);
     lv_obj_set_style_text_color(battery_icon_label_, lv_color_hex(kOnxColorMuted), 0);
-    lv_obj_align(battery_icon_label_, LV_ALIGN_RIGHT_MID, -48, 0);
-    lv_obj_set_width(battery_pct_label_, 44);
+    lv_obj_align(battery_icon_label_, LV_ALIGN_RIGHT_MID, kOnxLandscapeLayout ? -72 : -48, 0);
+    lv_obj_set_width(battery_pct_label_, kOnxLandscapeLayout ? 68 : 44);
     lv_obj_set_style_text_align(battery_pct_label_, LV_TEXT_ALIGN_RIGHT, 0);
     lv_obj_set_style_text_font(battery_pct_label_, dosis20, 0);
     lv_obj_set_style_text_color(battery_pct_label_, lv_color_hex(kOnxColorMuted), 0);
     lv_obj_align(battery_pct_label_, LV_ALIGN_RIGHT_MID, 0, 0);
 
     lv_obj_set_size(badge_slot_, 60, 60);
-    lv_obj_align(badge_slot_, LV_ALIGN_TOP_LEFT, 12, 57);
+    lv_obj_align(badge_slot_, LV_ALIGN_TOP_LEFT,
+                 kOnxLandscapeLayout ? 21 : 12,
+                 kOnxLandscapeLayout ? 57 : 57);
     lv_obj_set_size(logo_badge_, 60, 60);
     lv_obj_set_style_radius(logo_badge_, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(logo_badge_, lv_color_hex(kOnxColorPanel), 0);
@@ -3455,40 +3477,76 @@ esp_err_t Ui::build_dashboard() {
     lv_obj_set_style_border_opa(logo_badge_, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(logo_badge_, 1, 0);
     lv_obj_center(logo_badge_);
-    lv_image_set_scale(logo_image_, 112);
+    lv_image_set_scale(logo_image_, kOnxLandscapeLayout ? 102 : 112);
     lv_obj_center(logo_image_);
 
     onx_job_label_ = lv_label_create(page1_);
     set_label_text_if_changed(onx_job_label_, "Waiting for printer data");
-    lv_obj_set_pos(onx_job_label_, 90, 54);
-    lv_obj_set_size(onx_job_label_, 218, 42);
+    lv_obj_set_pos(onx_job_label_, kOnxLandscapeLayout ? 220 : 90,
+                   kOnxLandscapeLayout ? 50 : 54);
+    lv_obj_set_size(onx_job_label_, kOnxLandscapeLayout ? 248 : 218,
+                    kOnxLandscapeLayout ? 44 : 42);
     lv_label_set_long_mode(onx_job_label_, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_font(onx_job_label_, dosis20, 0);
     lv_obj_set_style_text_color(onx_job_label_, lv_color_hex(kOnxColorText), 0);
 
-    lv_obj_set_size(detail_label_, 218, 18);
-    lv_obj_align(detail_label_, LV_ALIGN_TOP_LEFT, 90, 96);
-    lv_label_set_long_mode(detail_label_, LV_LABEL_LONG_DOT);
-    lv_obj_set_style_text_align(detail_label_, LV_TEXT_ALIGN_LEFT, 0);
-    lv_obj_set_style_text_font(detail_label_, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_color(detail_label_, lv_color_hex(kOnxColorMuted), 0);
+    if (kOnxLandscapeLayout) {
+      onx_layer_line_label_ = lv_label_create(page1_);
+      set_label_text_if_changed(onx_layer_line_label_, "Layer: -- / --");
+      lv_obj_set_pos(onx_layer_line_label_, 220, 98);
+      lv_obj_set_size(onx_layer_line_label_, 248, 20);
+      lv_label_set_long_mode(onx_layer_line_label_, LV_LABEL_LONG_DOT);
+      lv_obj_set_style_text_align(onx_layer_line_label_, LV_TEXT_ALIGN_LEFT, 0);
+      lv_obj_set_style_text_font(onx_layer_line_label_, info20, 0);
+      lv_obj_set_style_text_color(onx_layer_line_label_, lv_color_hex(kOnxColorSoft), 0);
 
-    onx_progress_panel_ = create_onx_panel(page1_, 12, 140, 296, 104, kOnxColorPanel);
+      lv_obj_set_pos(detail_label_, 220, 222);
+      lv_obj_set_size(detail_label_, 248, 54);
+      lv_label_set_long_mode(detail_label_, LV_LABEL_LONG_WRAP);
+      lv_obj_set_style_text_align(detail_label_, LV_TEXT_ALIGN_LEFT, 0);
+      lv_obj_set_style_text_font(detail_label_, &lv_font_montserrat_14, 0);
+      lv_obj_set_style_text_color(detail_label_, lv_color_hex(kOnxColorSoft), 0);
+      lv_obj_set_style_bg_color(detail_label_, lv_color_hex(kOnxColorPanel), 0);
+      lv_obj_set_style_bg_opa(detail_label_, LV_OPA_COVER, 0);
+      lv_obj_set_style_border_color(detail_label_, lv_color_hex(kOnxColorLine), 0);
+      lv_obj_set_style_border_opa(detail_label_, LV_OPA_COVER, 0);
+      lv_obj_set_style_border_width(detail_label_, 1, 0);
+      lv_obj_set_style_radius(detail_label_, 8, 0);
+      lv_obj_set_style_pad_hor(detail_label_, 10, 0);
+      lv_obj_set_style_pad_ver(detail_label_, 8, 0);
+    } else {
+      lv_obj_set_size(detail_label_, 218, 18);
+      lv_obj_align(detail_label_, LV_ALIGN_TOP_LEFT, 90, 96);
+      lv_label_set_long_mode(detail_label_, LV_LABEL_LONG_DOT);
+      lv_obj_set_style_text_align(detail_label_, LV_TEXT_ALIGN_LEFT, 0);
+      lv_obj_set_style_text_font(detail_label_, &lv_font_montserrat_14, 0);
+      lv_obj_set_style_text_color(detail_label_, lv_color_hex(kOnxColorMuted), 0);
+    }
+
+    onx_progress_panel_ = create_onx_panel(page1_, kOnxMainLeftPanelX, kOnxMainLeftPanelY,
+                                           kOnxMainLeftPanelW, kOnxMainLeftPanelH,
+                                           kOnxColorPanel);
     lv_obj_set_parent(progress_label_, onx_progress_panel_);
     lv_obj_set_style_translate_x(progress_label_, 0, 0);
     lv_obj_set_style_translate_y(progress_label_, 0, 0);
-    lv_obj_align(progress_label_, LV_ALIGN_TOP_LEFT, 14, 8);
-    lv_obj_set_width(progress_label_, 110);
-    lv_obj_set_style_text_font(progress_label_, dosis32, 0);
+    lv_obj_align(progress_label_, LV_ALIGN_TOP_LEFT,
+                 kOnxLandscapeLayout ? 80 : 14,
+                 kOnxLandscapeLayout ? 6 : 8);
+    lv_obj_set_width(progress_label_, kOnxLandscapeLayout ? 104 : 110);
+    lv_obj_set_style_text_font(progress_label_, kOnxLandscapeLayout ? dosis40 : dosis32, 0);
     lv_obj_set_style_text_align(progress_label_, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_parent(status_label_, onx_progress_panel_);
-    lv_obj_align(status_label_, LV_ALIGN_TOP_LEFT, 130, 18);
-    lv_obj_set_width(status_label_, 152);
-    lv_obj_set_style_text_align(status_label_, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_align(status_label_, LV_ALIGN_TOP_LEFT,
+                 kOnxLandscapeLayout ? 80 : 130,
+                 kOnxLandscapeLayout ? 52 : 18);
+    lv_obj_set_width(status_label_, kOnxLandscapeLayout ? 104 : 152);
+    lv_obj_set_style_text_align(status_label_, kOnxLandscapeLayout ? LV_TEXT_ALIGN_LEFT : LV_TEXT_ALIGN_RIGHT, 0);
     lv_obj_set_style_text_font(status_label_, dosis20, 0);
     onx_progress_bar_ = lv_bar_create(onx_progress_panel_);
-    lv_obj_set_pos(onx_progress_bar_, 12, 84);
-    lv_obj_set_size(onx_progress_bar_, 272, 10);
+    lv_obj_set_pos(onx_progress_bar_, kOnxLandscapeLayout ? 12 : 12,
+                   kOnxLandscapeLayout ? 94 : 84);
+    lv_obj_set_size(onx_progress_bar_, kOnxLandscapeLayout ? 172 : 272,
+                    kOnxLandscapeLayout ? 12 : 10);
     lv_bar_set_range(onx_progress_bar_, 0, 100);
     lv_bar_set_value(onx_progress_bar_, 0, LV_ANIM_OFF);
     lv_obj_set_style_radius(onx_progress_bar_, 6, LV_PART_MAIN);
@@ -3497,18 +3555,43 @@ esp_err_t Ui::build_dashboard() {
     lv_obj_set_style_bg_opa(onx_progress_bar_, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_bg_color(onx_progress_bar_, lv_color_hex(arc_colors_.printing), LV_PART_INDICATOR);
 
-    onx_nozzle_card_ = create_onx_panel(page1_, 12, 258, 143, 66, kOnxColorPanel2);
-    onx_bed_card_ = create_onx_panel(page1_, 165, 258, 143, 66, kOnxColorPanel2);
-    onx_layer_card_ = create_onx_panel(page1_, 12, 334, 143, 66, kOnxColorPanel2);
-    onx_detail_card_ = create_onx_panel(page1_, 165, 334, 143, 66, kOnxColorPanel2);
-    create_onx_caption(onx_nozzle_card_, "Nozzle", 10, 8, 123, &lv_font_montserrat_14);
-    create_onx_caption(onx_bed_card_, "Bed", 10, 8, 123, &lv_font_montserrat_14);
-    create_onx_caption(onx_layer_card_, "Layer", 10, 8, 123, &lv_font_montserrat_14);
-    create_onx_caption(onx_detail_card_, "Detail", 10, 8, 123, &lv_font_montserrat_14);
+    onx_nozzle_card_ = create_onx_panel(page1_,
+                                        kOnxLandscapeLayout ? 220 : 12,
+                                        kOnxLandscapeLayout ? 132 : 258,
+                                        kOnxLandscapeLayout ? 120 : 143,
+                                        kOnxLandscapeLayout ? 38 : 66,
+                                        kOnxColorPanel2);
+    onx_bed_card_ = create_onx_panel(page1_,
+                                     kOnxLandscapeLayout ? 348 : 165,
+                                     kOnxLandscapeLayout ? 132 : 258,
+                                     kOnxLandscapeLayout ? 120 : 143,
+                                     kOnxLandscapeLayout ? 38 : 66,
+                                     kOnxColorPanel2);
+    onx_layer_card_ = create_onx_panel(page1_,
+                                       kOnxLandscapeLayout ? 220 : 12,
+                                       kOnxLandscapeLayout ? 178 : 334,
+                                       kOnxLandscapeLayout ? 120 : 143,
+                                       kOnxLandscapeLayout ? 38 : 66,
+                                       kOnxColorPanel2);
+    onx_detail_card_ = create_onx_panel(page1_,
+                                        kOnxLandscapeLayout ? 348 : 165,
+                                        kOnxLandscapeLayout ? 178 : 334,
+                                        kOnxLandscapeLayout ? 120 : 143,
+                                        kOnxLandscapeLayout ? 38 : 66,
+                                        kOnxColorPanel2);
+    create_onx_caption(onx_nozzle_card_, "Nozzle", 8, kOnxLandscapeLayout ? 3 : 8,
+                       kOnxLandscapeLayout ? 104 : 123, &lv_font_montserrat_14);
+    create_onx_caption(onx_bed_card_, "Bed", 8, kOnxLandscapeLayout ? 3 : 8,
+                       kOnxLandscapeLayout ? 104 : 123, &lv_font_montserrat_14);
+    create_onx_caption(onx_layer_card_, "Layer", 8, kOnxLandscapeLayout ? 3 : 8,
+                       kOnxLandscapeLayout ? 104 : 123, &lv_font_montserrat_14);
+    create_onx_caption(onx_detail_card_, "Detail", 8, kOnxLandscapeLayout ? 3 : 8,
+                       kOnxLandscapeLayout ? 104 : 123, &lv_font_montserrat_14);
 
     lv_obj_set_parent(nozzle_value_label_, onx_nozzle_card_);
-    lv_obj_align(nozzle_value_label_, LV_ALIGN_TOP_LEFT, 10, 32);
-    lv_obj_set_size(nozzle_value_label_, 123, 24);
+    lv_obj_align(nozzle_value_label_, LV_ALIGN_TOP_LEFT, 8, kOnxLandscapeLayout ? 18 : 32);
+    lv_obj_set_size(nozzle_value_label_, kOnxLandscapeLayout ? 104 : 123,
+                    kOnxLandscapeLayout ? 18 : 24);
     lv_label_set_long_mode(nozzle_value_label_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(nozzle_value_label_, dosis20, 0);
     lv_obj_set_style_text_align(nozzle_value_label_, LV_TEXT_ALIGN_LEFT, 0);
@@ -3519,8 +3602,9 @@ esp_err_t Ui::build_dashboard() {
     set_hidden(nozzle_prefix_label_, true);
 
     lv_obj_set_parent(bed_value_label_, onx_bed_card_);
-    lv_obj_align(bed_value_label_, LV_ALIGN_TOP_LEFT, 10, 32);
-    lv_obj_set_size(bed_value_label_, 123, 24);
+    lv_obj_align(bed_value_label_, LV_ALIGN_TOP_LEFT, 8, kOnxLandscapeLayout ? 18 : 32);
+    lv_obj_set_size(bed_value_label_, kOnxLandscapeLayout ? 104 : 123,
+                    kOnxLandscapeLayout ? 18 : 24);
     lv_label_set_long_mode(bed_value_label_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(bed_value_label_, dosis20, 0);
     lv_obj_set_style_text_align(bed_value_label_, LV_TEXT_ALIGN_LEFT, 0);
@@ -3531,22 +3615,27 @@ esp_err_t Ui::build_dashboard() {
     set_hidden(bed_prefix_label_, true);
 
     lv_obj_set_parent(layer_label_, onx_layer_card_);
-    lv_obj_align(layer_label_, LV_ALIGN_TOP_LEFT, 10, 32);
-    lv_obj_set_size(layer_label_, 123, 24);
+    lv_obj_align(layer_label_, LV_ALIGN_TOP_LEFT, 8, kOnxLandscapeLayout ? 18 : 32);
+    lv_obj_set_size(layer_label_, kOnxLandscapeLayout ? 104 : 123,
+                    kOnxLandscapeLayout ? 18 : 24);
     lv_label_set_long_mode(layer_label_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(layer_label_, dosis20, 0);
     lv_obj_set_style_text_align(layer_label_, LV_TEXT_ALIGN_LEFT, 0);
 
     onx_metric_detail_label_ = lv_label_create(onx_detail_card_);
     set_label_text_if_changed(onx_metric_detail_label_, "Waiting");
-    lv_obj_align(onx_metric_detail_label_, LV_ALIGN_TOP_LEFT, 10, 32);
-    lv_obj_set_size(onx_metric_detail_label_, 123, 24);
+    lv_obj_align(onx_metric_detail_label_, LV_ALIGN_TOP_LEFT, 8, kOnxLandscapeLayout ? 18 : 32);
+    lv_obj_set_size(onx_metric_detail_label_, kOnxLandscapeLayout ? 104 : 123,
+                    kOnxLandscapeLayout ? 18 : 24);
     lv_label_set_long_mode(onx_metric_detail_label_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(onx_metric_detail_label_, dosis20, 0);
     lv_obj_set_style_text_color(onx_metric_detail_label_, lv_color_hex(kOnxColorSoft), 0);
 
-    lv_obj_set_size(remaining_row_, 296, 48);
-    lv_obj_align(remaining_row_, LV_ALIGN_TOP_LEFT, 12, 412);
+    lv_obj_set_size(remaining_row_, kOnxLandscapeLayout ? 172 : 296,
+                    kOnxLandscapeLayout ? 50 : 48);
+    lv_obj_align(remaining_row_, LV_ALIGN_TOP_LEFT,
+                 kOnxLandscapeLayout ? 24 : 12,
+                 kOnxLandscapeLayout ? 178 : 412);
     lv_obj_set_style_bg_color(remaining_row_, lv_color_hex(kOnxColorPanel), 0);
     lv_obj_set_style_bg_opa(remaining_row_, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(remaining_row_, lv_color_hex(kOnxColorLine), 0);
@@ -3556,10 +3645,21 @@ esp_err_t Ui::build_dashboard() {
     lv_obj_set_style_pad_all(remaining_row_, 0, 0);
     lv_obj_set_style_pad_column(remaining_row_, 8, 0);
     lv_obj_set_style_text_color(remaining_label_, lv_color_hex(kOnxColorCyan), 0);
+    if (kOnxLandscapeLayout) {
+      lv_obj_set_width(remaining_label_, 126);
+      lv_label_set_long_mode(remaining_label_, LV_LABEL_LONG_DOT);
+      lv_obj_set_style_text_align(remaining_label_, LV_TEXT_ALIGN_CENTER, 0);
+      lv_obj_set_style_text_font(remaining_label_, dosis32, 0);
+      lv_obj_set_style_text_font(remaining_prefix_label_, mdi30, 0);
+      lv_obj_move_foreground(badge_slot_);
+      lv_obj_move_foreground(remaining_row_);
+    }
 
-    lv_obj_set_size(portal_hint_label_, 296, 16);
+    lv_obj_set_size(portal_hint_label_, kOnxLandscapeLayout ? 456 : 296,
+                    kOnxLandscapeLayout ? 20 : 16);
     lv_label_set_long_mode(portal_hint_label_, LV_LABEL_LONG_DOT);
-    lv_obj_align(portal_hint_label_, LV_ALIGN_TOP_LEFT, 12, 462);
+    lv_obj_align(portal_hint_label_, LV_ALIGN_TOP_LEFT,
+                 12, kOnxLandscapeLayout ? 292 : 462);
     lv_obj_set_style_text_align(portal_hint_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_font(portal_hint_label_, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(portal_hint_label_, lv_color_hex(kOnxColorMuted), 0);
@@ -3846,6 +3946,7 @@ void Ui::apply_page_visibility() {
     set_hidden(onx_bed_card_, !on_page1);
     set_hidden(onx_layer_card_, !on_page1);
     set_hidden(onx_detail_card_, !on_page1);
+    set_hidden(onx_layer_line_label_, !on_page1);
     set_hidden(onx_metric_detail_label_, !on_page1);
     set_hidden(nozzle_prefix_label_, true);
     set_hidden(bed_prefix_label_, true);
@@ -4263,9 +4364,11 @@ void Ui::update_portal_access_visuals_locked() {
   set_hidden(portal_hint_label_, !show_hint);
   if (show_hint) {
     if (kOnxUiLayout) {
-      lv_obj_set_size(portal_hint_label_, 296, 16);
+      lv_obj_set_size(portal_hint_label_, kOnxLandscapeLayout ? 456 : 296,
+                      kOnxLandscapeLayout ? 20 : 16);
       lv_label_set_long_mode(portal_hint_label_, LV_LABEL_LONG_DOT);
-      lv_obj_align(portal_hint_label_, LV_ALIGN_TOP_LEFT, 12, 462);
+      lv_obj_align(portal_hint_label_, LV_ALIGN_TOP_LEFT,
+                   12, kOnxLandscapeLayout ? 292 : 462);
     }
     set_label_text_if_changed(portal_hint_label_, portal_hint_text_);
     set_hidden(detail_label_, true);
