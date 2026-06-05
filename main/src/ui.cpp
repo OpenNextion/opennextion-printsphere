@@ -101,6 +101,12 @@ constexpr int kOnxMainLeftPanelX = 12;
 constexpr int kOnxMainLeftPanelY = kOnxLandscapeLayout ? 48 : 140;
 constexpr int kOnxMainLeftPanelW = kOnxLandscapeLayout ? 196 : 296;
 constexpr int kOnxMainLeftPanelH = kOnxLandscapeLayout ? 228 : 104;
+constexpr int kOnxPrinterListX = 12;
+constexpr int kOnxPrinterListY = kOnxLandscapeLayout ? 48 : 60;
+constexpr int kOnxPrinterListW = kOnxLandscapeLayout ? 300 : 296;
+constexpr int kOnxPrinterListH = kOnxLandscapeLayout ? 228 : 348;
+constexpr int kOnxPrinterCardW = kOnxLandscapeLayout ? 300 : 296;
+constexpr int kOnxPrinterCardH = kOnxLandscapeLayout ? 66 : 76;
 constexpr uint32_t kOnxColorBg = 0x050607;
 constexpr uint32_t kOnxColorPanel = 0x111418;
 constexpr uint32_t kOnxColorPanel2 = 0x171B20;
@@ -1611,6 +1617,39 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
   const bool empty = cards.empty();
   set_hidden(page0_card_list_, empty);
   set_hidden(page0_empty_note_, !empty);
+  if (kOnxLandscapeLayout && page0_detail_panel_ != nullptr) {
+    set_hidden(page0_detail_panel_, false);
+    if (empty) {
+      set_label_text_if_changed(page0_detail_title_, "No printer");
+      set_label_text_if_changed(page0_detail_state_, "No profile");
+      set_label_text_if_changed(page0_detail_host_, "Use Web Config");
+      set_label_text_if_changed(page0_detail_hint_, "Hold for PIN");
+      lv_obj_set_style_text_color(page0_detail_state_, lv_color_hex(kOnxColorMuted), 0);
+    } else {
+      const PrinterCardInfo* selected = &cards.front();
+      for (const auto& info : cards) {
+        if (info.active) {
+          selected = &info;
+          break;
+        }
+      }
+      const std::string title = selected->name.empty()
+          ? (selected->model.empty() ? "Printer" : selected->model)
+          : selected->name;
+      const std::string state = selected->connected
+          ? "Online"
+          : (selected->active ? "Waiting for LAN" : "Profile ready");
+      const std::string host = selected->host.empty() ? "No local IP" : selected->host;
+      set_label_text_if_changed(page0_detail_title_, title);
+      set_label_text_if_changed(page0_detail_state_, state);
+      set_label_text_if_changed(page0_detail_host_, host);
+      set_label_text_if_changed(page0_detail_hint_,
+                                selected->active ? "Active printer" : "Tap card to select");
+      lv_obj_set_style_text_color(page0_detail_state_,
+                                  lv_color_hex(selected->connected ? 0x4ADE80 : kOnxColorMuted),
+                                  0);
+    }
+  }
   if (empty) {
     return;
   }
@@ -1622,8 +1661,9 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
   for (const auto& info : cards) {
     // Card container — glasmorphism-lite: semi-transparent bg + shadow elevation
     lv_obj_t* card = lv_obj_create(page0_card_list_);
-    lv_obj_set_size(card, kOnxUiLayout ? 296 : 340, LV_SIZE_CONTENT);
-    lv_obj_set_style_min_height(card, kOnxUiLayout ? 76 : 72, 0);
+    lv_obj_set_size(card, kOnxUiLayout ? kOnxPrinterCardW : 340,
+                    kOnxLandscapeLayout ? kOnxPrinterCardH : LV_SIZE_CONTENT);
+    lv_obj_set_style_min_height(card, kOnxUiLayout ? kOnxPrinterCardH : 72, 0);
     lv_obj_set_style_bg_color(card,
                               lv_color_hex(kOnxUiLayout ? kOnxColorPanel2 : 0x1E1E1E), 0);
     lv_obj_set_style_bg_opa(card, kOnxUiLayout ? LV_OPA_COVER : 195, 0);
@@ -1654,16 +1694,29 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
     enable_touch_bubble(card);
     lv_obj_add_event_cb(card, &Ui::printer_card_click_cb, LV_EVENT_CLICKED, this);
 
+    if (kOnxLandscapeLayout) {
+      lv_obj_t* stripe = lv_obj_create(card);
+      lv_obj_set_pos(stripe, 0, 0);
+      lv_obj_set_size(stripe, 5, kOnxPrinterCardH);
+      lv_obj_set_style_bg_color(stripe, lv_color_hex(0x4ADE80), 0);
+      lv_obj_set_style_bg_opa(stripe, info.active ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+      lv_obj_set_style_border_width(stripe, 0, 0);
+      lv_obj_set_style_radius(stripe, 0, 0);
+      lv_obj_clear_flag(stripe, LV_OBJ_FLAG_SCROLLABLE);
+      lv_obj_clear_flag(stripe, LV_OBJ_FLAG_CLICKABLE);
+    }
+
     // Status dot — small colored circle in top-right
     lv_obj_t* dot = lv_obj_create(card);
-    lv_obj_set_size(dot, 10, 10);
+    lv_obj_set_size(dot, kOnxLandscapeLayout ? 8 : 10, kOnxLandscapeLayout ? 8 : 10);
     lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
     lv_obj_set_style_bg_color(dot, info.connected
                                    ? lv_color_hex(kOnxUiLayout ? 0x4ADE80 : 0x00CC66)
                                    : lv_color_hex(0x666666), 0);
     lv_obj_set_style_border_width(dot, 0, 0);
-    lv_obj_align(dot, LV_ALIGN_TOP_RIGHT, 0, 0);
+    lv_obj_align(dot, LV_ALIGN_TOP_RIGHT, kOnxLandscapeLayout ? -10 : 0,
+                 kOnxLandscapeLayout ? 34 : 0);
     lv_obj_clear_flag(dot, LV_OBJ_FLAG_CLICKABLE);
     if (info.connected) {
       start_dot_pulse(dot);
@@ -1673,32 +1726,71 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
     lv_obj_t* name_lbl = lv_label_create(card);
     const std::string display_name = info.name.empty() ? info.model : info.name;
     set_label_text_if_changed(name_lbl, display_name);
-    lv_obj_set_width(name_lbl, kOnxUiLayout ? 250 : 300);
+    lv_obj_set_width(name_lbl, kOnxLandscapeLayout ? 210 : (kOnxUiLayout ? 250 : 300));
     lv_label_set_long_mode(name_lbl, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(name_lbl, font_name, 0);
     lv_obj_set_style_text_color(name_lbl,
                                 lv_color_hex(kOnxUiLayout ? kOnxColorText : 0xFFFFFF), 0);
-    lv_obj_align(name_lbl, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_obj_align(name_lbl, LV_ALIGN_TOP_LEFT, kOnxLandscapeLayout ? 10 : 0,
+                 kOnxLandscapeLayout ? -2 : 0);
+
+    if (kOnxLandscapeLayout) {
+      lv_obj_t* pill = lv_label_create(card);
+      char pill_text[12] = {};
+      if (info.active) {
+        std::snprintf(pill_text, sizeof(pill_text), "act");
+      } else {
+        std::snprintf(pill_text, sizeof(pill_text), "%u", static_cast<unsigned>(info.index + 1));
+      }
+      set_label_text_if_changed(pill, pill_text);
+      lv_obj_set_size(pill, 38, 22);
+      lv_label_set_long_mode(pill, LV_LABEL_LONG_DOT);
+      lv_obj_set_style_text_align(pill, LV_TEXT_ALIGN_CENTER, 0);
+      lv_obj_set_style_text_font(pill, &lv_font_montserrat_14, 0);
+      lv_obj_set_style_text_color(pill, lv_color_hex(kOnxColorSoft), 0);
+      lv_obj_set_style_bg_color(pill, lv_color_hex(kOnxColorPanel), 0);
+      lv_obj_set_style_bg_opa(pill, LV_OPA_COVER, 0);
+      lv_obj_set_style_radius(pill, 11, 0);
+      lv_obj_set_style_pad_top(pill, 2, 0);
+      lv_obj_align(pill, LV_ALIGN_TOP_RIGHT, -10, 4);
+      lv_obj_clear_flag(pill, LV_OBJ_FLAG_CLICKABLE);
+    }
 
     // Model
     lv_obj_t* model_lbl = lv_label_create(card);
     set_label_text_if_changed(model_lbl, info.model.empty() ? "Unknown" : info.model);
-    lv_obj_set_width(model_lbl, kOnxUiLayout ? 260 : 300);
+    lv_obj_set_width(model_lbl, kOnxLandscapeLayout ? 260 : (kOnxUiLayout ? 260 : 300));
     lv_label_set_long_mode(model_lbl, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(model_lbl, font_detail, 0);
     lv_obj_set_style_text_color(model_lbl,
                                 lv_color_hex(kOnxUiLayout ? kOnxColorMuted : 0x888888), 0);
-    lv_obj_align_to(model_lbl, name_lbl, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 2);
+    if (kOnxLandscapeLayout) {
+      lv_obj_align(model_lbl, LV_ALIGN_TOP_LEFT, 10, 25);
+    } else {
+      lv_obj_align_to(model_lbl, name_lbl, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 2);
+    }
 
     // Host IP
     lv_obj_t* host_lbl = lv_label_create(card);
-    set_label_text_if_changed(host_lbl, info.host.empty() ? "No local IP" : info.host);
-    lv_obj_set_width(host_lbl, kOnxUiLayout ? 260 : 300);
+    std::string host_text = info.host.empty() ? "No local IP" : info.host;
+    if (kOnxLandscapeLayout) {
+      const char* state = info.connected ? "Online" : (info.active ? "Waiting" : "Profile");
+      host_text = std::string(state) + " · " + host_text;
+    }
+    set_label_text_if_changed(host_lbl, host_text);
+    lv_obj_set_width(host_lbl, kOnxLandscapeLayout ? 260 : (kOnxUiLayout ? 260 : 300));
     lv_label_set_long_mode(host_lbl, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(host_lbl, font_detail, 0);
     lv_obj_set_style_text_color(host_lbl,
-                                lv_color_hex(kOnxUiLayout ? kOnxColorMuted : 0x666666), 0);
-    lv_obj_align_to(host_lbl, model_lbl, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 2);
+                                lv_color_hex(kOnxLandscapeLayout && info.connected
+                                                 ? 0x4ADE80
+                                                 : (kOnxUiLayout ? kOnxColorMuted : 0x666666)),
+                                0);
+    if (kOnxLandscapeLayout) {
+      lv_obj_align(host_lbl, LV_ALIGN_TOP_LEFT, 10, 44);
+    } else {
+      lv_obj_align_to(host_lbl, model_lbl, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 2);
+    }
 
     PrinterCardWidgets cw;
     cw.card = card;
@@ -3179,7 +3271,10 @@ esp_err_t Ui::build_dashboard() {
   enable_touch_bubble(page2_);
   enable_touch_bubble(page3_);
 
-  add_onx_page_chrome(page0_, "Printers", "1/8", "Hold: Web Config PIN", dosis20, info20);
+  add_onx_page_chrome(page0_, "Printers",
+                      kOnxLandscapeLayout ? "Web Config" : "1/8",
+                      kOnxLandscapeLayout ? "Hold for Web Config PIN" : "Hold: Web Config PIN",
+                      dosis20, info20);
   for (int u = 0; u < kMaxAmsUnits; ++u) {
     char ams_title[16] = {};
     char ams_meta[8] = {};
@@ -3206,8 +3301,8 @@ esp_err_t Ui::build_dashboard() {
 
   page0_card_list_ = lv_obj_create(page0_);
   if (kOnxUiLayout) {
-    lv_obj_set_pos(page0_card_list_, 12, 60);
-    lv_obj_set_size(page0_card_list_, 296, 348);
+    lv_obj_set_pos(page0_card_list_, kOnxPrinterListX, kOnxPrinterListY);
+    lv_obj_set_size(page0_card_list_, kOnxPrinterListW, kOnxPrinterListH);
   } else {
     lv_obj_set_size(page0_card_list_, 380, 300);
     lv_obj_align(page0_card_list_, LV_ALIGN_CENTER, 0, 20);
@@ -3215,7 +3310,7 @@ esp_err_t Ui::build_dashboard() {
   make_transparent(page0_card_list_);
   lv_obj_set_flex_flow(page0_card_list_, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_flex_align(page0_card_list_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  lv_obj_set_style_pad_row(page0_card_list_, 10, 0);
+  lv_obj_set_style_pad_row(page0_card_list_, kOnxLandscapeLayout ? 8 : 10, 0);
   lv_obj_set_style_pad_all(page0_card_list_, 0, 0);
   lv_obj_set_scroll_dir(page0_card_list_, LV_DIR_VER);
   lv_obj_set_scrollbar_mode(page0_card_list_, LV_SCROLLBAR_MODE_OFF);
@@ -3230,12 +3325,50 @@ esp_err_t Ui::build_dashboard() {
   lv_obj_set_style_text_color(page0_empty_note_,
                               lv_color_hex(kOnxUiLayout ? kOnxColorMuted : 0x666666), 0);
   if (kOnxUiLayout) {
-    lv_obj_set_pos(page0_empty_note_, 12, 180);
-    lv_obj_set_size(page0_empty_note_, 296, 100);
+    lv_obj_set_pos(page0_empty_note_, 12, kOnxLandscapeLayout ? 116 : 180);
+    lv_obj_set_size(page0_empty_note_, kOnxLandscapeLayout ? 300 : 296,
+                    kOnxLandscapeLayout ? 72 : 100);
   } else {
     lv_obj_align(page0_empty_note_, LV_ALIGN_CENTER, 0, 20);
   }
   lv_obj_add_flag(page0_empty_note_, LV_OBJ_FLAG_HIDDEN);
+
+  if (kOnxLandscapeLayout) {
+    page0_detail_panel_ = create_onx_panel(page0_, 324, 48, 144, 228, kOnxColorPanel);
+    enable_touch_bubble(page0_detail_panel_);
+
+    page0_detail_title_ = lv_label_create(page0_detail_panel_);
+    set_label_text_if_changed(page0_detail_title_, "No printer");
+    lv_obj_set_pos(page0_detail_title_, 10, 12);
+    lv_obj_set_size(page0_detail_title_, 124, 42);
+    lv_label_set_long_mode(page0_detail_title_, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_font(page0_detail_title_, dosis20, 0);
+    lv_obj_set_style_text_color(page0_detail_title_, lv_color_hex(kOnxColorText), 0);
+
+    page0_detail_state_ = lv_label_create(page0_detail_panel_);
+    set_label_text_if_changed(page0_detail_state_, "No profile");
+    lv_obj_set_pos(page0_detail_state_, 10, 62);
+    lv_obj_set_size(page0_detail_state_, 124, 22);
+    lv_label_set_long_mode(page0_detail_state_, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_font(page0_detail_state_, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(page0_detail_state_, lv_color_hex(kOnxColorMuted), 0);
+
+    page0_detail_host_ = lv_label_create(page0_detail_panel_);
+    set_label_text_if_changed(page0_detail_host_, "Use Web Config");
+    lv_obj_set_pos(page0_detail_host_, 10, 94);
+    lv_obj_set_size(page0_detail_host_, 124, 40);
+    lv_label_set_long_mode(page0_detail_host_, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_font(page0_detail_host_, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(page0_detail_host_, lv_color_hex(kOnxColorMuted), 0);
+
+    page0_detail_hint_ = lv_label_create(page0_detail_panel_);
+    set_label_text_if_changed(page0_detail_hint_, "Hold for PIN");
+    lv_obj_set_pos(page0_detail_hint_, 10, 164);
+    lv_obj_set_size(page0_detail_hint_, 124, 42);
+    lv_label_set_long_mode(page0_detail_hint_, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_font(page0_detail_hint_, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(page0_detail_hint_, lv_color_hex(kOnxColorSoft), 0);
+  }
 
   // --- AMS pages (one per AMS unit, indices kPageIdxAmsFirst..kPageIdxAmsLast) ---
   // Build all kMaxAmsUnits AMS pages up front; each page is hidden until the

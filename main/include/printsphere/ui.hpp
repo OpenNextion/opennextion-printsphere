@@ -129,6 +129,11 @@ class Ui {
   lv_obj_t* page0_title_ = nullptr;
   lv_obj_t* page0_card_list_ = nullptr;
   lv_obj_t* page0_empty_note_ = nullptr;
+  lv_obj_t* page0_detail_panel_ = nullptr;
+  lv_obj_t* page0_detail_title_ = nullptr;
+  lv_obj_t* page0_detail_state_ = nullptr;
+  lv_obj_t* page0_detail_host_ = nullptr;
+  lv_obj_t* page0_detail_hint_ = nullptr;
 
   struct PrinterCardWidgets {
     lv_obj_t* card = nullptr;
