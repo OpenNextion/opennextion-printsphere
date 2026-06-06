@@ -254,8 +254,9 @@ void Application::run() {
       const auto profiles = config_store_.load_printer_profiles();
       const uint8_t active_idx = config_store_.load_active_printer_index();
       const bool local_connected = printer_client_.snapshot().local_connected;
+      const BambuCloudSnapshot card_cloud_snapshot = cloud_client_.snapshot();
       std::vector<Ui::PrinterCardInfo> cards;
-      cards.reserve(profiles.size());
+      cards.reserve(profiles.empty() ? 1U : profiles.size());
       for (const auto& p : profiles) {
         Ui::PrinterCardInfo ci;
         ci.index = p.index;
@@ -264,6 +265,17 @@ void Application::run() {
         ci.host = p.host;
         ci.active = (p.index == active_idx);
         ci.connected = ci.active && local_connected;
+        cards.push_back(std::move(ci));
+      }
+      if (cards.empty() && source_mode_ != SourceMode::kLocalOnly &&
+          !card_cloud_snapshot.resolved_serial.empty()) {
+        Ui::PrinterCardInfo ci;
+        ci.index = active_idx;
+        ci.name = card_cloud_snapshot.resolved_serial;
+        ci.model = to_string(card_cloud_snapshot.model);
+        ci.host = "Bambu Cloud";
+        ci.active = true;
+        ci.connected = card_cloud_snapshot.connected || card_cloud_snapshot.session_connected;
         cards.push_back(std::move(ci));
       }
       ui_.update_printer_cards(cards);

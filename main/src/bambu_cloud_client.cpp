@@ -29,6 +29,9 @@
 
 namespace printsphere {
 
+extern const uint8_t globalsign_root_r3_pem_start[] asm("_binary_globalsign_root_r3_pem_start");
+extern const uint8_t globalsign_root_r3_pem_end[] asm("_binary_globalsign_root_r3_pem_end");
+
 namespace {
 
 constexpr char kTag[] = "printsphere.cloud";
@@ -260,6 +263,25 @@ const char* cloud_mqtt_host(CloudRegion region) {
   }
 }
 
+const char* bambu_cn_cloud_ca_pem() {
+  return reinterpret_cast<const char*>(globalsign_root_r3_pem_start);
+}
+
+size_t bambu_cn_cloud_ca_pem_len() {
+  return static_cast<size_t>(globalsign_root_r3_pem_end - globalsign_root_r3_pem_start);
+}
+
+void configure_cloud_http_certificate(CloudRegion region, esp_http_client_config_t* config) {
+  if (config == nullptr) {
+    return;
+  }
+  if (region == CloudRegion::kCN) {
+    config->cert_pem = bambu_cn_cloud_ca_pem();
+    return;
+  }
+  config->crt_bundle_attach = esp_crt_bundle_attach;
+}
+
 CloudSetupStage setup_stage_for_session_state(bool configured, bool connected,
                                               bool verification_required, bool tfa_required,
                                               bool session_ready,
@@ -389,6 +411,51 @@ bool parse_https_url(const std::string& url, ParsedHttpsUrl* parsed) {
 
   parsed->target = (path_start == std::string::npos) ? "/" : url.substr(path_start);
   return !parsed->host.empty() && !parsed->target.empty();
+}
+
+bool preview_host_uses_globalsign_r3_ca(std::string host) {
+  std::transform(host.begin(), host.end(), host.begin(),
+                 [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+  constexpr std::string_view kBambuRoot = "bambulab.cn";
+  constexpr std::string_view kBambuSuffix = ".bambulab.cn";
+  constexpr std::string_view kAliyunRoot = "aliyuncs.com";
+  constexpr std::string_view kAliyunSuffix = ".aliyuncs.com";
+  if (host == kBambuRoot || host == kAliyunRoot) {
+    return true;
+  }
+  return (host.size() > kBambuSuffix.size() &&
+          host.compare(host.size() - kBambuSuffix.size(), kBambuSuffix.size(), kBambuSuffix) == 0) ||
+         (host.size() > kAliyunSuffix.size() &&
+          host.compare(host.size() - kAliyunSuffix.size(), kAliyunSuffix.size(), kAliyunSuffix) == 0);
+}
+
+bool preview_url_uses_globalsign_r3_ca(const std::string& url) {
+  ParsedHttpsUrl parsed = {};
+  return parse_https_url(url, &parsed) && preview_host_uses_globalsign_r3_ca(parsed.host);
+}
+
+void configure_preview_http_certificate(const std::string& url,
+                                        esp_http_client_config_t* config) {
+  if (config == nullptr) {
+    return;
+  }
+  if (preview_url_uses_globalsign_r3_ca(url)) {
+    config->cert_pem = bambu_cn_cloud_ca_pem();
+    return;
+  }
+  config->crt_bundle_attach = esp_crt_bundle_attach;
+}
+
+void configure_preview_tls_certificate(const std::string& url, esp_tls_cfg_t* config) {
+  if (config == nullptr) {
+    return;
+  }
+  if (preview_url_uses_globalsign_r3_ca(url)) {
+    config->cacert_buf = globalsign_root_r3_pem_start;
+    config->cacert_bytes = bambu_cn_cloud_ca_pem_len();
+    return;
+  }
+  config->crt_bundle_attach = esp_crt_bundle_attach;
 }
 
 std::string header_value_ci(std::string_view headers, std::string_view key) {
@@ -3807,7 +3874,7 @@ bool BambuCloudClient::authenticate_with_tfa_code(const std::string& code) {
   esp_http_client_config_t config = {};
   config.url = url.c_str();
   config.timeout_ms = 10000;
-  config.crt_bundle_attach = esp_crt_bundle_attach;
+  configure_cloud_http_certificate(credentials_.region, &config);
   config.method = HTTP_METHOD_POST;
   config.keep_alive_enable = false;
   config.buffer_size = 2048;
@@ -4312,7 +4379,7 @@ std::shared_ptr<std::vector<uint8_t>> BambuCloudClient::download_preview_image(c
     config.keep_alive_enable = false;
     config.buffer_size = 4096;
     config.buffer_size_tx = 1024;
-    config.crt_bundle_attach = esp_crt_bundle_attach;
+    configure_preview_http_certificate(url, &config);
     config.addr_type = HTTP_ADDR_TYPE_INET;
     config.tls_version = ESP_HTTP_CLIENT_TLS_VER_TLS_1_2;
 #if CONFIG_MBEDTLS_DYNAMIC_BUFFER
@@ -4381,7 +4448,7 @@ std::shared_ptr<std::vector<uint8_t>> BambuCloudClient::download_preview_image(c
   range_config.keep_alive_enable = true;
   range_config.buffer_size = 4096;
   range_config.buffer_size_tx = 1024;
-  range_config.crt_bundle_attach = esp_crt_bundle_attach;
+  configure_preview_http_certificate(url, &range_config);
   range_config.addr_type = HTTP_ADDR_TYPE_INET;
   range_config.tls_version = ESP_HTTP_CLIENT_TLS_VER_TLS_1_2;
 #if CONFIG_MBEDTLS_DYNAMIC_BUFFER
@@ -4471,7 +4538,7 @@ std::shared_ptr<std::vector<uint8_t>> BambuCloudClient::download_preview_image(c
   }
 
   esp_tls_cfg_t tls_cfg = {};
-  tls_cfg.crt_bundle_attach = esp_crt_bundle_attach;
+  configure_preview_tls_certificate(url, &tls_cfg);
   tls_cfg.timeout_ms = 20000;
   tls_cfg.addr_family = ESP_TLS_AF_INET;
   tls_cfg.tls_version = ESP_TLS_VER_TLS_1_2;
@@ -4603,7 +4670,7 @@ bool BambuCloudClient::perform_json_request(const std::string& url, const char* 
   esp_http_client_config_t config = {};
   config.url = url.c_str();
   config.timeout_ms = 10000;
-  config.crt_bundle_attach = esp_crt_bundle_attach;
+  configure_cloud_http_certificate(credentials_.region, &config);
   config.method = (std::strcmp(method, "POST") == 0) ? HTTP_METHOD_POST : HTTP_METHOD_GET;
   config.keep_alive_enable = false;
   config.buffer_size = 2048;
