@@ -563,28 +563,36 @@ Overlay 优先级不变：
 | 2026-06-06 复验 Main 标题仍有方框 | 字体/fallback 策略不足 | ASCII-safe + `[UTF8]` 仍不满足验收，且当前 Dosis/Montserrat 对标记字符也可能缺 glyph；必须启用 CJK 字体优先显示真实 UTF-8 |
 | 2026-06-06 复验 Printer 卡片裁切 | 坐标/高度问题 | `62..70 px` 卡片高度不足以承载三行真实字体；必须改为 `92 px` 或删减为两行 |
 | 2026-06-06 复验 Printer 右栏拥挤 | 文案拆分问题 | `Open <ip> | Hold for PIN` 不能塞进 `120 px` label；必须拆成短行 |
+| 2026-06-06 复验 Cover 仍乱码/方框 | 字体绑定或子集覆盖问题 | Main 硬编码中文已可显示，说明渲染链路可用；Cover 必须确认绑定同一 CJK font，且字体子集必须覆盖真实云端 job name |
 
 ### CJK 文本策略
 
 横屏 demo 当前阶段改为 CJK 字体优先策略，目标是“真实显示 UTF-8 用户文本，且不显示方框”：
 
 - 使用项目内生成的 `onx_cjk_16` 作为首选 CJK 字体，用于动态用户文本。字体源为 LVGL 依赖中开源 `SourceHanSansSC-Normal.otf` 生成的 16 px 子集。
-- 当前子集必须覆盖 demo 需要的 ASCII、常用标点，以及 `测试中文文件名打印机配置项目模型板载云端本地状态在线离线设置访问码温度进度层数封面图片失败等待刷新自动来源任务名称打开长按详情喷嘴热床剩余时间完成暂停错误材料颜色预览相机网络连接成功`。
-- 若后续实机发现新字符缺 glyph，优先扩展并重新生成 `onx_cjk_16` 子集；不得回退到 `[UTF8]` / `[CJK]` 页面标签。
+- 当前子集必须覆盖 demo 需要的 ASCII、常用标点、当前真实云端标题 `OpenNextion3.5寸外壳后倾` 中的中文字符 `寸外壳后倾`，以及 `测试中文文件名打印机配置项目模型板载云端本地状态在线离线设置访问码温度进度层数封面图片失败等待刷新自动来源任务名称打开长按详情喷嘴热床剩余时间完成暂停错误材料颜色预览相机网络连接成功`。
+- 后续实机发现新字符缺 glyph 时，必须扩展并重新生成 `onx_cjk_16` 子集；不得回退到 `[UTF8]` / `[CJK]` 页面标签，也不得把中文标题替换成 ASCII-safe 版本作为正常 UI。
 - 固定英文 UI、数值、单位、IP、PIN、serial、温度、进度、层数等机器字段继续使用现有 Dosis/Montserrat/MDI 字体，不扩大字体影响面。
 - 不修改 `PrinterSnapshot` 或协议原始字符串，不改文件名来源；只在 UI label helper 和具体 label font 选择中处理显示。
 - `[UTF8]` / `[CJK]` 不得作为正常用户页面输出；这类标记只能用于日志或极端 fallback。
 - CJK label 必须使用 UTF-8 原文或 UTF-8 原文的安全截断结果；不得先逐字节过滤成 ASCII fragment。
-- 如果后续发现某个字符不在 `onx_cjk_16` 覆盖范围内，页面 fallback 只能显示无括号 ASCII 语义文本，例如 `Project name` 或 `Printer name`，不得显示 `[UTF8]` 标记。
+- 字体子集覆盖不足是 UI font 资产缺口，不是协议问题。若 Main 可显示同样字符但 Cover 仍乱码/方框，实现线程必须优先检查 Cover label 是否使用 `onx_cjk_16`，不得更改协议字段或 job name 来源。
 - 所有 CJK label 仍必须应用本规范的 width/long mode/行数限制；中文显示不能遮挡 layer、detail、IP/PIN 或 Cover 图片。
+
+字体子集覆盖原则：
+
+- 必须覆盖当前实机真实标题：`寸外壳后倾`。
+- 必须覆盖常见打印任务/文件名类别：尺寸单位（寸、毫米、厘米）、结构件（外壳、底座、支架、面板、后盖、前盖、按钮、卡扣、螺丝、固定、倾斜）、方向/位置（前、后、左、右、上、下、内、外）、材料/颜色（白、黑、灰、透明、红、蓝、绿、黄）、版本/状态（测试、最终、修改、优化、打印）。
+- 必须覆盖 UI 已使用或可能拼接到用户文本旁的中文标点和常用符号：`（）【】、。-_. `，以及 ASCII 数字/字母。
+- 不要求 demo 阶段启用全量 CJK；只有当真实任务名持续出现大量缺字、维护子集成本高于尺寸风险时，才由主线程决定是否切换更大字体。
 
 必须纳入 CJK 字体策略的文本源：
 
 | UI 文本 | 现有来源 | 横屏显示要求 |
 |---|---|---|
 | Main job title | `job_name`，fallback `gcode_file`、`preview_title` 待实现线程按现有代码确认 | `x=220,y=48,w=248,h=38`，CJK 16；最多 2 行或 DOT，底部不得越过 `y=86`，不得遮挡 layer |
-| Cover title | `preview_subnote_text(snapshot)`：`job_name`、`preview_title`、`cloud_detail`、`preview_hint` | `x=276,y=60,w=180,h=72`，CJK 16 或 14；最多 2-3 行，优先 2 行，不得显示方框 |
-| Cover detail | `cloud_detail`、`preview_hint`、source/detail 派生短句 | `x=276,y=142,w=180,h=96`，CJK 14；最多 4 行，不得与 title 重叠 |
+| Cover title | `preview_subnote_text(snapshot)`：`job_name`、`preview_title`、`cloud_detail`、`preview_hint` | `x=276,y=60,w=180,h=72`，必须绑定 `onx_cjk_16`；最多 2 行优先，必要时第 3 行 DOT/截断，不得显示方框 |
+| Cover detail | `cloud_detail`、`preview_hint`、source/detail 派生短句 | `x=276,y=142,w=180,h=96`，含中文时必须绑定 `onx_cjk_16`；最多 4 行 WRAP，超出 DOT/截断，不得与 title 重叠 |
 | Printer card name | `Ui::PrinterCardInfo.name`、`model`、cloud fallback 名称 | card 内 `x=12,y=10,w=208,h=24`，CJK 16，单行 DOT |
 | Printer detail title | active `PrinterCardInfo` name/model/cloud fallback | `x=336,y=60,w=120,h=40`，CJK 16 或 14，最多 2 行；raw serial 禁止 |
 | Detail/error 普通文案 | `detail_text(snapshot)`、`cloud_detail`、`preview_hint` | 可 WRAP 但不得超过对应 label 高度；含用户标题时使用 CJK 14，错误/HMS 优先短摘要 |
@@ -594,7 +602,7 @@ Overlay 优先级不变：
 
 - `main/include/font/onx_cjk_16.c` 是项目内 CJK 子集字体源码，约 100 KB；不启用 LVGL 内置全量/大子集 CJK Kconfig 字体。
 - 主线程需要 build 验证最终 app size；C 源文件大小不等同最终二进制增量，验收以 portrait/landscape build 产物和 partition report 为准。
-- 若 build 余量不可接受，主线程再决定更小子集或 14 px 子集方案。
+- 若 build 余量不可接受，主线程再决定更小子集或 14 px 子集方案；但不得以 `[UTF8]` / `[CJK]` 页面标签作为验收方案。
 
 ### Printer 页 cloud serial 策略
 
@@ -685,6 +693,7 @@ Printer 页 Web Config 文案强制拆分：
 - 允许：`main/src/ui.cpp` 中字体引用、动态文本 helper、相关 label font 切换、横屏 label 文案、long mode、Cover/Printer text priority。
 - 如确有必要：`main/include/printsphere/ui.hpp` 中增加 UI 内部 helper 声明或 layout/font profile 常量。
 - 允许新增项目内字体子集源文件，并在 `main/CMakeLists.txt` 中接入该字体源。
+- 允许扩展 `onx_cjk_16` 字符覆盖；本轮最低必须包含真实云端标题 `OpenNextion3.5寸外壳后倾` 需要的 `寸外壳后倾`。
 - 禁止：`components/**`、BSP、cloud/local protocol client、Web Config/setup portal、证书、NVS schema、sdkconfig。
 - 实现完成后必须由实现线程构建 `portrait` 与 `landscape` 两个 profile；烧录和实机验证交由主线程执行。
 
@@ -776,6 +785,8 @@ Printer 页 Web Config 文案强制拆分：
 - 禁用页 skip/clamp 行为与竖屏一致。
 - 所有文本在 480 x 320 内不重叠、不越界；Main metric 和 Camera right panel 必须用实机修订后的 long mode/短文案策略。
 - H2C Cloud 场景下 Main job title、Cover title、Printer display name 必须使用 CJK font 显示真实 UTF-8 文本，不得显示 tofu 方框或页面级 `[UTF8]` / `[CJK]` 标记。
+- 使用真实云端 job name `OpenNextion3.5寸外壳后倾` 验收：Main job title、Cover title/detail 相关区域均不得出现方框；如果 Main 正常而 Cover 异常，判定为 Cover label 字体绑定或 Cover 文本路径问题。
+- 如果任一真实中文字符缺 glyph，验收结论为“扩展 `onx_cjk_16` 子集后重测”，不得以 ASCII-safe、`[UTF8]` 或 `[CJK]` 页面标签通过验收。
 - Printer 页 cloud-only serial 不得作为完整大标题换行；卡片和详情面板必须使用 nickname/model 优先和 shortened serial。
 - Printer 页卡片必须使用 `w=300,h=92,gap=10` 或两行删减方案；若显示三行，第三行必须完整可见且底部留白 `>=8 px`。
 - Printer 页右侧详情必须拆分 `Web Config`、`<ip>`、`Hold PIN`，禁止在 `120 px` label 内显示 `Open <ip> | Hold for PIN`。

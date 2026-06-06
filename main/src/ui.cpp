@@ -1081,6 +1081,19 @@ std::string layer_text(const PrinterSnapshot& snapshot) {
   return buffer;
 }
 
+std::string compact_layer_text(const PrinterSnapshot& snapshot) {
+  char buffer[24] = {};
+  if (snapshot.total_layers > 0) {
+    std::snprintf(buffer, sizeof(buffer), "%u/%u", snapshot.current_layer,
+                  snapshot.total_layers);
+  } else if (snapshot.current_layer > 0) {
+    std::snprintf(buffer, sizeof(buffer), "%u/--", snapshot.current_layer);
+  } else {
+    std::snprintf(buffer, sizeof(buffer), "--/--");
+  }
+  return buffer;
+}
+
 std::string remaining_text(const PrinterSnapshot& snapshot) {
   if (snapshot.ui_status == "done" || snapshot.lifecycle == PrintLifecycleState::kFinished) {
     return "Done";
@@ -1125,6 +1138,22 @@ std::string eta_text(const PrinterSnapshot& snapshot) {
   char buffer[8] = {};
   std::snprintf(buffer, sizeof(buffer), "%02d:%02d", local.tm_hour, local.tm_min);
   return buffer;
+}
+
+bool is_remaining_duration_value(const std::string& value) {
+  if (value == "--m") {
+    return true;
+  }
+  bool has_digit = false;
+  bool has_duration_unit = false;
+  for (const char ch : value) {
+    if (ch >= '0' && ch <= '9') {
+      has_digit = true;
+    } else if (ch == 'h' || ch == 'm') {
+      has_duration_unit = true;
+    }
+  }
+  return has_digit && has_duration_unit;
 }
 
 std::string display_text_for_label(const std::string& raw, const char* /*semantic_fallback*/) {
@@ -1912,7 +1941,7 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
       if (looks_like_serial(info.name)) {
         host_text = shortened_serial_for_display(info.name);
       }
-      host_text = std::string(state) + " · " + host_text;
+      host_text = std::string(state) + " | " + host_text;
     }
     set_label_text_if_changed(host_lbl, host_text);
     lv_obj_set_width(host_lbl, kOnxLandscapeLayout ? 252 : (kOnxUiLayout ? 260 : 300));
@@ -2274,7 +2303,8 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
   }
 
   const std::string layer = layer_text(snapshot);
-  set_label_text_if_changed(layer_label_, layer);
+  set_label_text_if_changed(layer_label_,
+                            kOnxLandscapeLayout ? compact_layer_text(snapshot) : layer);
   if (onx_layer_line_label_ != nullptr) {
     set_label_text_if_changed(onx_layer_line_label_, layer);
   }
@@ -2292,8 +2322,17 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
   const std::string remaining = show_eta_ ? eta_text(snapshot) : remaining_text(snapshot);
   set_label_text_if_changed(remaining_label_, remaining);
   // Hide the clock-icon prefix in ETA mode — leaves more room for "HH:MM"
-  // and avoids the redundant clock-glyph + clock-time stutter.
-  set_hidden(remaining_prefix_label_, show_eta_);
+  // and avoids the redundant clock-glyph + clock-time stutter. Landscape only
+  // shows the ASCII "Rem" prefix when the value is still a duration.
+  const bool show_remaining_prefix = kOnxLandscapeLayout
+      ? (!show_eta_ && is_remaining_duration_value(remaining))
+      : !show_eta_;
+  if (kOnxLandscapeLayout) {
+    lv_obj_set_width(remaining_label_, show_remaining_prefix ? 104 : 152);
+    lv_obj_set_style_text_align(remaining_label_,
+                                show_remaining_prefix ? LV_TEXT_ALIGN_LEFT : LV_TEXT_ALIGN_CENTER, 0);
+  }
+  set_hidden(remaining_prefix_label_, !show_remaining_prefix);
 
   char temp_buffer[24] = {};
   const bool is_dual_nozzle = snapshot.active_nozzle_index >= 0;
@@ -3939,7 +3978,7 @@ esp_err_t Ui::build_dashboard() {
   lv_obj_add_event_cb(remaining_row_, &Ui::remaining_row_event_cb, LV_EVENT_CLICKED, this);
 
   remaining_prefix_label_ = lv_label_create(remaining_row_);
-  set_label_text_if_changed(remaining_prefix_label_, kMdiClock);
+  set_label_text_if_changed(remaining_prefix_label_, kOnxLandscapeLayout ? "Rem" : kMdiClock);
   lv_obj_set_style_text_font(remaining_prefix_label_, mdi40, 0);
   lv_obj_set_style_text_color(remaining_prefix_label_, lv_color_hex(0x87CEEB), 0);
   lv_obj_set_style_pad_right(remaining_prefix_label_, 8, 0);
@@ -4101,27 +4140,27 @@ esp_err_t Ui::build_dashboard() {
     onx_layer_card_ = create_onx_panel(page1_,
                                        kOnxLandscapeLayout ? 220 : 12,
                                        kOnxLandscapeLayout ? 172 : 334,
-                                       kOnxLandscapeLayout ? 120 : 143,
+                                       kOnxLandscapeLayout ? 150 : 143,
                                        kOnxLandscapeLayout ? 52 : 66,
                                        kOnxColorPanel2);
     onx_detail_card_ = create_onx_panel(page1_,
-                                        kOnxLandscapeLayout ? 348 : 165,
+                                        kOnxLandscapeLayout ? 378 : 165,
                                         kOnxLandscapeLayout ? 172 : 334,
-                                        kOnxLandscapeLayout ? 120 : 143,
+                                        kOnxLandscapeLayout ? 90 : 143,
                                         kOnxLandscapeLayout ? 52 : 66,
                                         kOnxColorPanel2);
     create_onx_caption(onx_nozzle_card_, "Nozzle", 8, kOnxLandscapeLayout ? 5 : 8,
-                       kOnxLandscapeLayout ? 104 : 123, &lv_font_montserrat_14);
+                       kOnxLandscapeLayout ? 108 : 123, &lv_font_montserrat_14);
     create_onx_caption(onx_bed_card_, "Bed", 8, kOnxLandscapeLayout ? 5 : 8,
-                       kOnxLandscapeLayout ? 104 : 123, &lv_font_montserrat_14);
+                       kOnxLandscapeLayout ? 108 : 123, &lv_font_montserrat_14);
     create_onx_caption(onx_layer_card_, "Layer", 8, kOnxLandscapeLayout ? 5 : 8,
-                       kOnxLandscapeLayout ? 104 : 123, &lv_font_montserrat_14);
+                       kOnxLandscapeLayout ? 138 : 123, &lv_font_montserrat_14);
     create_onx_caption(onx_detail_card_, "Detail", 8, kOnxLandscapeLayout ? 5 : 8,
-                       kOnxLandscapeLayout ? 104 : 123, &lv_font_montserrat_14);
+                       kOnxLandscapeLayout ? 78 : 123, &lv_font_montserrat_14);
 
     lv_obj_set_parent(nozzle_value_label_, onx_nozzle_card_);
     lv_obj_align(nozzle_value_label_, LV_ALIGN_TOP_LEFT, 8, kOnxLandscapeLayout ? 23 : 32);
-    lv_obj_set_size(nozzle_value_label_, kOnxLandscapeLayout ? 104 : 123,
+    lv_obj_set_size(nozzle_value_label_, kOnxLandscapeLayout ? 108 : 123,
                     kOnxLandscapeLayout ? 20 : 24);
     lv_label_set_long_mode(nozzle_value_label_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(nozzle_value_label_, dosis20, 0);
@@ -4137,7 +4176,7 @@ esp_err_t Ui::build_dashboard() {
 
     lv_obj_set_parent(bed_value_label_, onx_bed_card_);
     lv_obj_align(bed_value_label_, LV_ALIGN_TOP_LEFT, 8, kOnxLandscapeLayout ? 23 : 32);
-    lv_obj_set_size(bed_value_label_, kOnxLandscapeLayout ? 104 : 123,
+    lv_obj_set_size(bed_value_label_, kOnxLandscapeLayout ? 108 : 123,
                     kOnxLandscapeLayout ? 20 : 24);
     lv_label_set_long_mode(bed_value_label_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(bed_value_label_, dosis20, 0);
@@ -4153,7 +4192,7 @@ esp_err_t Ui::build_dashboard() {
 
     lv_obj_set_parent(layer_label_, onx_layer_card_);
     lv_obj_align(layer_label_, LV_ALIGN_TOP_LEFT, 8, kOnxLandscapeLayout ? 23 : 32);
-    lv_obj_set_size(layer_label_, kOnxLandscapeLayout ? 104 : 123,
+    lv_obj_set_size(layer_label_, kOnxLandscapeLayout ? 138 : 123,
                     kOnxLandscapeLayout ? 20 : 24);
     lv_label_set_long_mode(layer_label_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(layer_label_, dosis20, 0);
@@ -4162,7 +4201,7 @@ esp_err_t Ui::build_dashboard() {
     onx_metric_detail_label_ = lv_label_create(onx_detail_card_);
     set_label_text_if_changed(onx_metric_detail_label_, "Waiting");
     lv_obj_align(onx_metric_detail_label_, LV_ALIGN_TOP_LEFT, 8, kOnxLandscapeLayout ? 23 : 32);
-    lv_obj_set_size(onx_metric_detail_label_, kOnxLandscapeLayout ? 104 : 123,
+    lv_obj_set_size(onx_metric_detail_label_, kOnxLandscapeLayout ? 78 : 123,
                     kOnxLandscapeLayout ? 20 : 24);
     lv_label_set_long_mode(onx_metric_detail_label_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(onx_metric_detail_label_, dosis20, 0);
@@ -4170,10 +4209,10 @@ esp_err_t Ui::build_dashboard() {
     lv_obj_set_style_text_color(onx_metric_detail_label_, lv_color_hex(kOnxColorSoft), 0);
 
     lv_obj_set_size(remaining_row_, kOnxLandscapeLayout ? 172 : 296,
-                    kOnxLandscapeLayout ? 50 : 48);
+                    kOnxLandscapeLayout ? 56 : 48);
     lv_obj_align(remaining_row_, LV_ALIGN_TOP_LEFT,
                  kOnxLandscapeLayout ? 24 : 12,
-                 kOnxLandscapeLayout ? 178 : 412);
+                 kOnxLandscapeLayout ? 174 : 412);
     lv_obj_set_style_bg_color(remaining_row_, lv_color_hex(kOnxColorPanel), 0);
     lv_obj_set_style_bg_opa(remaining_row_, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(remaining_row_, lv_color_hex(kOnxColorLine), 0);
@@ -4181,14 +4220,19 @@ esp_err_t Ui::build_dashboard() {
     lv_obj_set_style_border_width(remaining_row_, 1, 0);
     lv_obj_set_style_radius(remaining_row_, 8, 0);
     lv_obj_set_style_pad_all(remaining_row_, 0, 0);
-    lv_obj_set_style_pad_column(remaining_row_, 8, 0);
+    lv_obj_set_style_pad_column(remaining_row_, kOnxLandscapeLayout ? 4 : 8, 0);
     lv_obj_set_style_text_color(remaining_label_, lv_color_hex(kOnxColorCyan), 0);
     if (kOnxLandscapeLayout) {
-      lv_obj_set_width(remaining_label_, 126);
+      lv_obj_set_width(remaining_label_, 104);
       lv_label_set_long_mode(remaining_label_, LV_LABEL_LONG_DOT);
-      lv_obj_set_style_text_align(remaining_label_, LV_TEXT_ALIGN_CENTER, 0);
+      lv_obj_set_style_text_align(remaining_label_, LV_TEXT_ALIGN_LEFT, 0);
       lv_obj_set_style_text_font(remaining_label_, dosis32, 0);
-      lv_obj_set_style_text_font(remaining_prefix_label_, mdi30, 0);
+      lv_obj_set_width(remaining_prefix_label_, 42);
+      lv_label_set_long_mode(remaining_prefix_label_, LV_LABEL_LONG_DOT);
+      lv_obj_set_style_text_align(remaining_prefix_label_, LV_TEXT_ALIGN_RIGHT, 0);
+      lv_obj_set_style_text_font(remaining_prefix_label_, dosis32, 0);
+      lv_obj_set_style_pad_right(remaining_prefix_label_, 0, 0);
+      lv_obj_add_flag(remaining_prefix_label_, LV_OBJ_FLAG_HIDDEN);
       lv_obj_move_foreground(badge_slot_);
       lv_obj_move_foreground(remaining_row_);
     }
