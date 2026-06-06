@@ -153,7 +153,7 @@
 | 全屏 | `480 x 320` | 横向翻页、竖向亮度、长按 PIN、首触唤醒 |
 | Printer card | `300 x 92` | 点击切换 profile |
 | Bambu logo | 视觉 `54 x 54`，触控 `>=60 x 60` | 支持 chamber light 时点击 toggle |
-| Remaining/ETA row | `172 x 50` | 点击切换 remaining/ETA |
+| Remaining/ETA row | `172 x 56` | 点击切换 remaining/ETA |
 | Camera image | `300 x 224` | 小位移 tap 请求刷新 |
 | AMS tray | `108 x 128` | 第一版 no-op |
 | EXT row | `456 x 44` | 第一版 no-op |
@@ -212,15 +212,14 @@
 |---|---|---|---|
 | topbar status | `x=12,y=10,w=260,h=28` | `18/#F7FAFC`; state color for error/warn | 无 |
 | topbar meta | `x=292,y=10,w=176,h=28` | `12/#8B98A8/right` | battery/source |
-| left panel | `x=12,y=48,w=196,h=228` | card | 容器 |
+| left panel | `x=12,y=48,w=196,h=190` | card | 容器 |
 | logo button | `x=24,y=60,w=54,h=54` | Bambu image `48 x 48` | chamber light |
-| logo touch | `x=21,y=57,w=60,h=60` | invisible hitbox | 点击 |
+| logo touch/button | `x=21,y=57,w=60,h=60` | circular button frame + Bambu image; status color/gray recolor indicates chamber light state; no text label | chamber light toggle |
 | percent | `x=92,y=56,w=104,h=42` | `dosis_40,38,#F7FAFC` | 无 |
 | lifecycle | `x=92,y=100,w=104,h=28` | `dosis_32,21-24`, 状态色 | 无 |
 | progress bar | `x=24,y=142,w=172,h=12` | bg `#20252B`, fill `#4ADE80 -> #60A5FA` | 无 |
-| remaining row | `x=24,y=178,w=172,h=50` | card, `#87CEEB` | 点击切换 |
-| remaining label | row 内 `x=10,y=7,w=152,h=13` | `12/#87CEEB` | 文案 |
-| remaining value | row 内 `x=10,y=24,w=152,h=25` | `dosis_32/40,25,#87CEEB` | remaining/ETA |
+| remaining/status button | `x=24,y=174,w=172,h=56` | card, panel2 fill + `#87CEEB`, visible button frame | remaining/ETA toggle when time is valid |
+| remaining/status label | card 内 `x=8,y=10,w=156,h=36` | `dosis_32,28,#87CEEB/center,DOT` | 时间态单 label：`Rem 1h 28m` / `ETA 14:32`；非时间态只显示 `Done` / `Idle` / `Setup` / `Paused` / `Error` |
 | job title | `x=220,y=48,w=248,h=38` | CJK font `16/#F7FAFC` | 最多 2 行或 DOT；不得遮挡 layer |
 | layer | `x=220,y=90,w=248,h=18` | `14/#C8D1DC/bold` | 单行 DOT |
 | metric grid | `x=220,y=112,w=248,h=112` | 2 col x 2 row, card `120 x 52`, gap `8` | 无 |
@@ -373,17 +372,35 @@
 | 区域 | 坐标/尺寸 | 内容 |
 |---|---|---|
 | topbar | `x=12,y=10,w=456,h=28` | 左状态摘要，右电池/source |
-| 左主面板 | `x=12,y=48,w=196,h=228` | logo、百分比、生命周期、进度条、remaining/ETA |
+| 左主面板 | `x=12,y=48,w=196,h=190` | logo、百分比、生命周期、进度条、remaining/ETA |
 | 右信息区 | `x=220,y=48,w=248,h=228` | 任务名、层数、温度指标、detail/error |
 | PIN hint | `x=12,y=292,w=456,h=20` | 可隐藏，portal hint 优先 |
 
 左主面板：
 
-- logo/light button：`x=24,y=60,w=54,h=54`，触控扩到 `60 x 60`。
+- logo/chamber-light button：视觉/触控按钮约 `x=21,y=57,w=60,h=60`。Bambu 图像居中，用状态色、边框和灰/绿反馈表达 chamber light / 箱灯开关；不得新增明文文本标签。
+- logo 状态反馈必须保留：不支持箱灯时按钮禁用/弱化；支持且灯关时可灰色 recolor；灯开时恢复原色/绿色。灰色/绿色是箱灯状态，不是乱码或布局异常。
 - 大百分比：`x=92,y=56,w=104,h=42`，`dosis_40`。
 - 生命周期：`x=92,y=100,w=104,h=28`。
 - 进度条：`x=24,y=142,w=172,h=12`。
-- Remaining/ETA 行：`x=24,y=178,w=172,h=50`，整行点击切换。
+- Remaining/ETA/status button：`x=24,y=174,w=172,h=56`，整卡是时间控件，不是待填内容空白。打印中且有有效剩余时间时点击在 `Rem <duration>` 和 `ETA <time>` 间切换；横屏下使用一个居中 label，不拆 prefix/value 两个 label。Done/Finished/Idle/Setup/Error 等非时间状态不显示 `Rem/ETA`，只居中显示主状态，点击不应造成误导性文案变化。
+- 左主面板底部应随 remaining/status button 的内容边界收束：panel bottom `y=238`，Rem row bottom `y=230`，底部 padding `8px`。横屏下 remaining/status button 是 `onx_progress_panel_` child，面板内相对坐标 `x=12,y=126,w=172,h=56`，屏幕绝对坐标仍为 `x=24,y=174,w=172,h=56`。remaining/status button 使用 panel2 fill，避免与左主面板同色后被误读成一整块空背景。不得通过单纯下移 remaining/status button 来“填满空白”，以免改变 logo/chamber-light 与 remaining/ETA 两个交互热区的视觉关系。
+
+左侧交互控件语义：
+
+| 控件 | 触控区域 | 状态/视觉 | 行为边界 |
+|---|---|---|---|
+| Bambu logo chamber-light button | `x=21,y=57,w=60,h=60` | circular frame + Bambu image；无文本标签；灯关灰化，灯开原色/绿色 | 仅当 `chamber_light_supported` 时触发 chamber light toggle；不得改成普通 logo 或状态装饰 |
+| Time / Status | `x=24,y=174,w=172,h=56` | card-like frame；时间态单 label 显示 `Rem <duration>` / `ETA <time>`，非时间态仅居中状态 | 仅在有有效 remaining/ETA 时表达可切换；非时间态可保留点击热区但渲染必须稳定，不显示 `Rem` |
+
+Done/Idle/Setup 等非时间状态：
+
+- 横屏 `remaining_prefix_label_` 必须隐藏；所有时间/状态文字由 `remaining_label_` 单 label 承载。
+- `remaining_label_` 文案必须居中显示主状态：`Done`、`Idle`、`Setup`、`Paused`、`Error` 或 `--`。
+- 不显示 `Rem Done`、`Rem --m`、`ETA Done`。
+- 只有有效 wall-clock `HH:MM` 且不是 `--:--` 时才显示 `ETA <time>`；SNTP 未同步 fallback 到 duration 或无剩余时间占位时不得加 `ETA` 前缀。
+- 不使用非 ASCII glyph；不使用 clock icon。
+- 若底层仍保留 click handler，点击不得让卡片从状态文案跳到 `--:--` 或其他时间占位。
 
 右信息区实机修订：
 
@@ -512,7 +529,7 @@
 | 长按 PIN | 非 scrolling、非亮度 overlay、非横滑时触发 portal unlock request |
 | Printer card | 整卡点击切换 profile |
 | Logo | 仅在支持 chamber light 时点击切换灯光 |
-| Remaining row | 点击切换 remaining/ETA |
+| Remaining row | 仅在有有效时间语义时点击切换 remaining/ETA；非时间状态显示状态卡且不得误导 |
 | Camera tap | 相机页小位移 tap 请求刷新 |
 | AMS tray / Cover / Metrics / Error | 展示或 no-op，不新增控制 |
 
@@ -735,7 +752,7 @@ Printer 页 Web Config 文案强制拆分：
 | Slice | 范围 | 文件边界 | 验收 |
 |---|---|---|---|
 | L1 layout profile | 增加 `480 x 320` landscape layout/profile 选择，确保 pager/root/overlay 使用横屏尺寸 | board/layout config + UI layout constants；不改协议 | 根画布、触摸坐标、overlay 覆盖全屏 |
-| L2 Main page | 实现 Main 左状态卡 + 右信息区；按实机修订使用 `120 x 52` metric card、隐藏冲突 aux | 仅 UI 页面对象与坐标 | 进度、状态、任务名、层数、温度、remaining/ETA、logo/light 都不重叠 |
+| L2 Main page | 实现 Main 左状态卡 + 右信息区；按实机修订使用 `120 x 52` metric card、隐藏冲突 aux | 仅 UI 页面对象与坐标 | 进度、状态、任务名、层数、温度、remaining/ETA、logo/chamber-light 都不重叠 |
 | L3 Printer + pager | Printer Select 横屏列表、`92 px` 卡片、右侧 IP/PIN 拆分、离散左右翻页 | UI 页面对象/事件 | card 第三行不裁切；右栏 IP/PIN 可读；card 切换、禁用页 skip/clamp、首触唤醒/亮度/PIN 不回归 |
 | L4 AMS | AMS 横向四槽 row + EXT + error/no-op 边界 | UI AMS 布局/render | 1-4 AMS 按 count 启用；tray 点击 no-op |
 | L5 Cover | Cover 左图右文、CJK font、loading/detail 优先级 | UI preview image bounds/text | `preview_blob` contain；image visible 后 loading 消失；真实 UTF-8 标题不显示方框 |
@@ -751,7 +768,7 @@ Printer 页 Web Config 文案强制拆分：
 
 - 横屏 480 x 320 根页面、横向 pager 和页面启用/跳过。
 - Printer Select 横屏列表。
-- Main 横屏左右分栏，包含进度、状态、任务名、层数、温度、remaining/ETA、battery、portal hint、logo/light。
+- Main 横屏左右分栏，包含进度、状态、任务名、层数、温度、remaining/ETA、battery、portal hint、logo/chamber-light。
 - AMS 1 横屏四槽一行；AMS 2-4 按 count 启用。
 - Cover 左图右文。
 - Camera 大图 + 右侧信息面板 + tap refresh。

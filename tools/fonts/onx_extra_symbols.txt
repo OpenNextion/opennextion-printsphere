@@ -1,0 +1,5 @@
+# Additional PrintSphere ONX dynamic-text glyphs.
+# Keep this small and project-specific. The 2500 common table is the baseline.
+
+测试中文文件名打印机配置项目模型板载云端本地状态在线离线设置访问码温度进度层数封面图片失败等待刷新自动来源任务名称打开长按详情喷嘴热床剩余时间完成暂停错误材料颜色预览相机网络连接成功寸外壳后倾横支架底座前左右上下内盖板屏幕安装盒适配器
+
