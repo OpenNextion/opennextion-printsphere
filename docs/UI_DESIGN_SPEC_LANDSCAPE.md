@@ -214,16 +214,17 @@
 | remaining row | `x=24,y=178,w=172,h=50` | card, `#87CEEB` | 点击切换 |
 | remaining label | row 内 `x=10,y=7,w=152,h=13` | `12/#87CEEB` | 文案 |
 | remaining value | row 内 `x=10,y=24,w=152,h=25` | `dosis_32/40,25,#87CEEB` | remaining/ETA |
-| job title | `x=220,y=50,w=248,h=44` | `19/#F7FAFC/bold` | 最多 2 行 |
-| layer | `x=220,y=98,w=248,h=20` | `15/#C8D1DC/bold` | 无 |
-| metric grid | `x=220,y=132,w=248,h=84` | 2 col, gap `8` | 无 |
-| metric card 1 | `x=220,y=132,w=120,h=38` | card | no-op |
-| metric card 2 | `x=348,y=132,w=120,h=38` | card | no-op |
-| metric card 3 | `x=220,y=178,w=120,h=38` | card | no-op |
-| metric card 4 | `x=348,y=178,w=120,h=38` | card | no-op |
-| metric label | card 内 `x=8,y=5,w=104,h=12` | `11/#8B98A8/bold` | 无 |
-| metric value | card 内 `x=8,y=20,w=104,h=18` | `20/#F7FAFC/bold` | 无 |
-| detail/error card | `x=220,y=222,w=248,h=54` | card; error border/background red | no-op |
+| job title | `x=220,y=48,w=248,h=38` | `18-20/#F7FAFC/bold` | 最多 2 行；Idle/Setup 可单行 |
+| layer | `x=220,y=90,w=248,h=18` | `14/#C8D1DC/bold` | 单行 DOT |
+| metric grid | `x=220,y=112,w=248,h=112` | 2 col x 2 row, card `120 x 52`, gap `8` | 无 |
+| metric card 1 | `x=220,y=112,w=120,h=52` | card | no-op |
+| metric card 2 | `x=348,y=112,w=120,h=52` | card | no-op |
+| metric card 3 | `x=220,y=172,w=120,h=52` | card | no-op |
+| metric card 4 | `x=348,y=172,w=120,h=52` | card | no-op |
+| metric label | card 内 `x=8,y=5,w=104,h=14` | `12-14/#8B98A8/bold` | 单行 DOT |
+| metric value | card 内 `x=8,y=23,w=104,h=20` | `dosis_20` 或 Montserrat 18, `#F7FAFC/bold` | 单行 DOT |
+| metric aux | 默认隐藏；仅当能放入 card 内 `x=66,y=23,w=46,h=20` 时显示 | `12/#8B98A8/right` | 单行 DOT；不得压住 value |
+| detail/error card | `x=220,y=232,w=248,h=44` | card; error border/background red | no-op |
 | portal hint | `x=12,y=292,w=456,h=20` | `12/#8B98A8` | long press from global |
 
 #### Cover 坐标
@@ -250,11 +251,12 @@
 | image content | box 内 center/contain | RGB565 camera image | 不裁关键画面 |
 | no-image text | box center | `16/#C8D1DC/bold` | `Tap for new image` 等 |
 | info panel | `x=324,y=48,w=144,h=224` | card | no-op |
-| layer title | `x=336,y=60,w=120,h=28` | `23/#F7FAFC/bold` | 无 |
-| layer value | `x=336,y=90,w=120,h=28` | `23/#F7FAFC/bold` | `122 / 350` |
-| info lines | `x=336,y=130,w=120,h=84` | `13/#8B98A8` | auto refresh/source |
-| tap hint | `x=336,y=226,w=120,h=18` | `13/#87CEEB` | refresh request only |
-| bottom hint | `x=12,y=292,w=456,h=20` | `12/#8B98A8` | 可隐藏 |
+| camera status | image mode: `x=336,y=60,w=120,h=24`; no-image mode: image box center `x=34,y=136,w=256,h=48` | image mode `18-20/#F7FAFC/bold`; no-image `16/#C8D1DC/bold` | image mode DOT 1 行；no-image WRAP 最多 2 行 |
+| layer value | `x=336,y=90,w=120,h=24` | `14/#C8D1DC` | `Layer -- / --` 或隐藏；DOT 1 行 |
+| source line | `x=336,y=124,w=120,h=20` | `13/#8B98A8` | `Source: local/waiting`；DOT 1 行 |
+| refresh line | `x=336,y=156,w=120,h=20` | `13/#8B98A8` | `Auto 2s`；DOT 1 行 |
+| tap hint | `x=336,y=198,w=120,h=20` | `13/#87CEEB` | `Tap image`；DOT 1 行 |
+| bottom hint | hidden in image mode; optional no-image/error only `x=12,y=286,w=456,h=18` | `11-12/#8B98A8` | DOT 1 行；不得贴底或重复 tap hint |
 
 #### Overlay 坐标
 
@@ -371,12 +373,18 @@
 - 进度条：`x=24,y=142,w=172,h=12`。
 - Remaining/ETA 行：`x=24,y=178,w=172,h=50`，整行点击切换。
 
-右信息区：
+右信息区实机修订：
 
-- 任务名：`x=220,y=50,w=248,h=42`，最多 2 行。
-- Layer：`x=220,y=98,w=248,h=24`。
-- 指标网格：`x=220,y=132,w=248,h=78`，2 列 x 2 行，卡片 `119 x 36` 或 `119 x 38`。
-- detail/error：`x=220,y=220,w=248,h=56`，错误态红边，普通态灰字。
+- 任务名：`x=220,y=48,w=248,h=38`，最多 2 行；无任务时用 `No active job` 单行，`DOT`。
+- Layer：`x=220,y=90,w=248,h=18`，单行 `DOT`；显示 `Layer: -- / --` 时不得换行。
+- 指标网格：`x=220,y=112,w=248,h=112`，2 列 x 2 行，卡片固定 `120 x 52`，列/行 gap 均 `8`。
+- 指标卡片必须容纳两行：label `x=8,y=5,w=104,h=14`，value `x=8,y=23,w=104,h=20`。label/value 都用 `DOT`，不允许 `WRAP`。
+- metric value 只显示主值，例如 `--C`、`220C`、`122/350`、`setup`。若已有 aux label 会压住 value，横屏第一版必须隐藏 aux；只有 card 高度和宽度都确认有余量时才允许放到右侧 `x=66,y=23,w=46,h=20`。
+- detail/error：`x=220,y=232,w=248,h=44`，普通态最多 2 行 `WRAP`，错误态优先短 HMS/detail 摘要；不得与底部 portal hint 重叠。
+
+根因记录：
+
+- 2026-06-06 实机 Main/Status 截图显示旧规格 `120 x 38` metric card 在真实 Dosis/Montserrat 渲染下高度不足，label、value、aux 互相遮挡。此处属于“设计空间不足 + 实现未限制 aux/long mode”两者都有；修订后实现线程必须先按 `120 x 52` 卡片和隐藏 aux 落地。
 
 草图：
 
@@ -386,9 +394,9 @@
 | +------------------+ +------------------------+ |
 | | [logo] 87%       | | Bambu_P1S_gearbox...  | |
 | |        Printing  | | Layer 122 / 350       | |
-| | [progress bar]   | | Nozzle 220C  Bed 65C  | |
-| | Remaining 1h24m  | | Aux L219C    Ch 38C   | |
-| +------------------+ | Detail / error text    | |
+| | [progress bar]   | | +Nozzle---+ +Bed------+ |
+| | Remaining 1h24m  | | |220C     | |65C      | |
+| +------------------+ | +Layer----+ +Detail---+ |
 | Hold for Web Config PIN                       |
 +------------------------------------------------+
 ```
@@ -443,8 +451,8 @@
 |---|---|---|
 | topbar | `x=12,y=10,w=456,h=28` | `Camera`、状态/source |
 | camera image | `x=12,y=48,w=300,h=224` | RGB565，center/contain |
-| info panel | `x=324,y=48,w=144,h=224` | lifecycle、layer、refresh hint、source |
-| bottom hint | `x=12,y=292,w=456,h=20` | `Tap image to refresh` 或错误 |
+| info panel | `x=324,y=48,w=144,h=224` | status、layer、source、refresh、tap hint |
+| bottom hint | 默认隐藏；仅无图/错误时可用 `x=12,y=286,w=456,h=18` | 简短错误或 `Tap for new image`，不得重复右栏文案 |
 
 图片策略：
 
@@ -453,17 +461,30 @@
 - 图像区域和相机页小位移 tap 均表达“刷新”；实现仍沿用原 `camera_refresh_requested_`。
 - 无图状态保留图像框，显示 `Tap for new image`、`Camera offline` 或 `camera_detail`。
 
+右侧信息面板实机修订：
+
+- 保留 `300 x 224` 相机图，不为右栏牺牲图像宽度。问题根因不是图像过宽，而是右栏 `120 px` 内容宽度内塞入重复长句。
+- 右栏内容顺序固定为：status/lifecycle -> layer -> source -> refresh cadence -> tap hint。
+- 文案必须短化并去重：`Auto-refresh while open` 在右栏最多出现一次，优先显示为 `Auto 2s`；`Tap image area to refresh` 不进入右栏，右栏只用 `Tap image`。
+- image mode：status 在 `x=336,y=60,w=120,h=24`，`DOT` 1 行；layer 在 `x=336,y=90,w=120,h=24`，`DOT` 1 行；source 在 `x=336,y=124,w=120,h=20`；refresh 在 `x=336,y=156,w=120,h=20`；tap hint 在 `x=336,y=198,w=120,h=20`。
+- no-image mode：图像框中央显示主提示，`x=34,y=136,w=256,h=48`，`WRAP` 最多 2 行；右栏仍可显示 source/refresh/tap hint，但不得重复图像框主提示。
+- bottom hint 在 image mode 必须隐藏；无图或错误态如果确需显示，放到 `y=286,h=18`，字号 `11-12`，`DOT` 1 行，离底边至少 `14 px`，不得被屏幕边框遮挡。
+
+根因记录：
+
+- 2026-06-06 实机 Camera 截图显示旧规格允许 `Source: waiting\nAuto-refresh while open`、`Auto-refresh...`、`Tap image to refresh` 和底部 `Tap image area to refresh` 同时出现，造成重复、截断和贴底。此处属于“设计文案策略过满 + 实现把长句直接塞入 120 px label”两者都有；修订后实现线程必须先删重复文案、隐藏 image mode bottom hint。
+
 草图：
 
 ```text
 +------------------------------------------------+
 | Camera                         Printing local  |
 | +----------------------------+ +-------------+ |
-| |                            | | Layer       | |
-| |       300 x 224 cam        | | 122 / 350   | |
-| |                            | | Auto 2s     | |
-| +----------------------------+ | Tap refresh | |
-| Tap image to refresh            Source local  |
+| |                            | | Printing    | |
+| |       300 x 224 cam        | | L122/350    | |
+| |                            | | Source local| |
+| +----------------------------+ | Auto 2s     | |
+|                                | Tap image   | |
 +------------------------------------------------+
 ```
 
@@ -529,12 +550,16 @@ Overlay 优先级不变：
 
 | 类型 | 策略 |
 |---|---|
-| topbar 标题 | 单行省略 |
-| 任务名 | Main/Cover 最多两行；超出省略或短 marquee |
-| detail/error | 2 行内优先；错误可短 marquee，但避免大面积滚动 |
-| printer host/model | 单行省略 |
-| material name | 单行省略；材料类型必须保留 |
-| camera/detail hint | 1-2 行，超出省略 |
+| topbar 标题 | `DOT`，1 行 |
+| 任务名 | Main/Cover 最多 2 行；Main 空闲态优先单行 `DOT`；超出省略或短 marquee |
+| detail/error | 普通态最多 2 行 `WRAP`；错误可短 marquee，但避免大面积滚动 |
+| Main metric label/value | label/value 均 `DOT` 1 行；value 优先，aux 可隐藏 |
+| Main metric aux | 默认隐藏；显示时 `DOT` 1 行且不得与 value 同坐标 |
+| printer host/model | `DOT`，1 行 |
+| material name | `DOT`，1 行；材料类型必须保留 |
+| Camera image-mode status/layer/source/refresh/tap | 全部 `DOT`，各 1 行；右栏不允许 `WRAP` 长句 |
+| Camera no-image 主提示 | 图像框中央 `WRAP`，最多 2 行 |
+| Camera bottom hint | image mode 隐藏；无图/错误态 `DOT` 1 行 |
 
 ## 主线程交接与开发分片建议
 
@@ -543,11 +568,11 @@ Overlay 优先级不变：
 | Slice | 范围 | 文件边界 | 验收 |
 |---|---|---|---|
 | L1 layout profile | 增加 `480 x 320` landscape layout/profile 选择，确保 pager/root/overlay 使用横屏尺寸 | board/layout config + UI layout constants；不改协议 | 根画布、触摸坐标、overlay 覆盖全屏 |
-| L2 Main page | 实现 Main 左状态卡 + 右信息区 | 仅 UI 页面对象与坐标 | 进度、状态、任务名、层数、温度、remaining/ETA、logo/light 都不重叠 |
+| L2 Main page | 实现 Main 左状态卡 + 右信息区；按实机修订使用 `120 x 52` metric card、隐藏冲突 aux | 仅 UI 页面对象与坐标 | 进度、状态、任务名、层数、温度、remaining/ETA、logo/light 都不重叠 |
 | L3 Printer + pager | Printer Select 横屏列表和离散左右翻页 | UI 页面对象/事件 | card 切换、禁用页 skip/clamp、首触唤醒/亮度/PIN 不回归 |
 | L4 AMS | AMS 横向四槽 row + EXT + error/no-op 边界 | UI AMS 布局/render | 1-4 AMS 按 count 启用；tray 点击 no-op |
 | L5 Cover | Cover 左图右文 | UI preview image bounds/text | `preview_blob` contain，no image/offline/loading 文案正确 |
-| L6 Camera | Camera 300x224 + info panel | UI camera bounds/text | tap refresh 请求，离开/禁用释放图像，缓存策略不增加 |
+| L6 Camera | Camera `300 x 224` + 去重后的 info panel；image mode 隐藏 bottom hint | UI camera bounds/text | tap refresh 请求，离开/禁用释放图像，缓存策略不增加 |
 | L7 overlays/regression | PIN、brightness、portal hint、错误态、文本溢出总验收 | UI overlay/text only | 按本文档验收用例通过 |
 
 开发线程必须在每个 slice 回报：修改文件、是否触及非 UI 代码、截图/实机照片或日志证据、未通过项。主线程再决定是否进入下一 slice。
@@ -588,7 +613,7 @@ Overlay 优先级不变：
 - 通过 board/layout profile 选择 portrait/landscape，不改协议、不改 App 业务逻辑。
 - 横屏根画布、pager、overlay、图片 bounds 使用 `480 x 320`。
 - 禁用页 skip/clamp 行为与竖屏一致。
-- 所有文本在 480 x 320 内不重叠、不越界。
+- 所有文本在 480 x 320 内不重叠、不越界；Main metric 和 Camera right panel 必须用实机修订后的 long mode/短文案策略。
 - AMS tray、Cover image、指标卡片、错误面板点击 no-op。
 - 相机页不增加超过现有策略的图片缓存。
 
