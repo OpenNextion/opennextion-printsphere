@@ -994,10 +994,19 @@ std::string lifecycle_label(const PrinterSnapshot& snapshot) {
   }
 }
 
+std::string display_text_for_label(const std::string& raw, const char* semantic_fallback);
+std::string short_portal_hint_for_display(const PrinterSnapshot& snapshot, bool include_pin);
+bool looks_like_serial(const std::string& text);
+std::string shortened_serial_for_display(const std::string& serial);
+std::string printer_primary_title_for_display(const std::string& name, const std::string& model);
+std::string printer_secondary_for_display(const std::string& name, const std::string& model);
+
 std::string setup_access_text(const PrinterSnapshot& snapshot) {
   std::string text;
   if (!snapshot.setup_ap_ssid.empty()) {
-    text = "AP: " + snapshot.setup_ap_ssid;
+    text = "AP: " + (kOnxLandscapeLayout
+                         ? display_text_for_label(snapshot.setup_ap_ssid, "Setup SSID")
+                         : snapshot.setup_ap_ssid);
   }
   if (!snapshot.setup_ap_password.empty()) {
     if (!text.empty()) {
@@ -1115,6 +1124,181 @@ std::string eta_text(const PrinterSnapshot& snapshot) {
   char buffer[8] = {};
   std::snprintf(buffer, sizeof(buffer), "%02d:%02d", local.tm_hour, local.tm_min);
   return buffer;
+}
+
+bool utf8_next_codepoint(const std::string& text, size_t* index, uint32_t* codepoint) {
+  if (index == nullptr || codepoint == nullptr || *index >= text.size()) {
+    return false;
+  }
+  const unsigned char c0 = static_cast<unsigned char>(text[*index]);
+  if (c0 < 0x80U) {
+    *codepoint = c0;
+    ++(*index);
+    return true;
+  }
+  uint32_t value = 0;
+  size_t extra = 0;
+  if ((c0 & 0xE0U) == 0xC0U) {
+    value = c0 & 0x1FU;
+    extra = 1;
+  } else if ((c0 & 0xF0U) == 0xE0U) {
+    value = c0 & 0x0FU;
+    extra = 2;
+  } else if ((c0 & 0xF8U) == 0xF0U) {
+    value = c0 & 0x07U;
+    extra = 3;
+  } else {
+    *codepoint = c0;
+    ++(*index);
+    return true;
+  }
+  if (*index + extra >= text.size()) {
+    *codepoint = c0;
+    ++(*index);
+    return true;
+  }
+  for (size_t i = 1; i <= extra; ++i) {
+    const unsigned char cx = static_cast<unsigned char>(text[*index + i]);
+    if ((cx & 0xC0U) != 0x80U) {
+      *codepoint = c0;
+      ++(*index);
+      return true;
+    }
+    value = (value << 6U) | (cx & 0x3FU);
+  }
+  *index += extra + 1U;
+  *codepoint = value;
+  return true;
+}
+
+bool is_cjk_codepoint(uint32_t cp) {
+  return (cp >= 0x3400U && cp <= 0x9FFFU) ||
+         (cp >= 0xF900U && cp <= 0xFAFFU) ||
+         (cp >= 0x20000U && cp <= 0x2A6DFU) ||
+         (cp >= 0x2A700U && cp <= 0x2B73FU) ||
+         (cp >= 0x2B740U && cp <= 0x2B81FU) ||
+         (cp >= 0x2B820U && cp <= 0x2CEAFU);
+}
+
+bool contains_cjk(const std::string& text) {
+  size_t i = 0;
+  uint32_t cp = 0;
+  while (utf8_next_codepoint(text, &i, &cp)) {
+    if (is_cjk_codepoint(cp)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool is_visible_ascii(unsigned char c) {
+  return c >= 0x21U && c <= 0x7EU;
+}
+
+std::string trim_ascii_fragment(std::string text) {
+  while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front()))) {
+    text.erase(text.begin());
+  }
+  while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back()))) {
+    text.pop_back();
+  }
+  return text;
+}
+
+std::string display_text_for_label(const std::string& raw, const char* semantic_fallback) {
+  if (!contains_cjk(raw)) {
+    return raw;
+  }
+  std::string ascii;
+  ascii.reserve(raw.size());
+  size_t visible_count = 0;
+  for (unsigned char c : raw) {
+    if (c < 0x80U) {
+      ascii.push_back(static_cast<char>(std::isspace(c) ? ' ' : c));
+      if (is_visible_ascii(c)) {
+        ++visible_count;
+      }
+    }
+  }
+  ascii = trim_ascii_fragment(ascii);
+  if (visible_count < 3 || ascii.empty()) {
+    return std::string(semantic_fallback) + " [CJK]";
+  }
+  if (ascii.size() > 24U) {
+    const std::string prefix = trim_ascii_fragment(ascii.substr(0, 14));
+    const std::string suffix = trim_ascii_fragment(ascii.substr(ascii.size() - 8));
+    return prefix + "..." + suffix + " [CJK]";
+  }
+  return ascii + " [CJK]";
+}
+
+bool looks_like_serial(const std::string& text) {
+  if (text.size() < 12U || text.size() > 32U) {
+    return false;
+  }
+  bool has_digit = false;
+  bool has_alpha = false;
+  for (unsigned char c : text) {
+    if (std::isdigit(c)) {
+      has_digit = true;
+    } else if (std::isalpha(c)) {
+      has_alpha = true;
+    } else if (c != '-' && c != '_') {
+      return false;
+    }
+  }
+  return has_digit && has_alpha;
+}
+
+std::string shortened_serial_for_display(const std::string& serial) {
+  if (serial.size() <= 12U) {
+    return serial;
+  }
+  return "SN " + serial.substr(0, 6) + "..." + serial.substr(serial.size() - 4);
+}
+
+bool model_is_displayable(const std::string& model) {
+  return !model.empty() && model != "Unknown" && model != "unknown";
+}
+
+std::string printer_primary_title_for_display(const std::string& name, const std::string& model) {
+  if (!name.empty() && !looks_like_serial(name)) {
+    return display_text_for_label(name, "Printer name");
+  }
+  if (model_is_displayable(model)) {
+    return display_text_for_label(model, "Printer name");
+  }
+  return looks_like_serial(name) ? "Cloud printer" : "Printer";
+}
+
+std::string printer_secondary_for_display(const std::string& name, const std::string& model) {
+  if (looks_like_serial(name)) {
+    if (model_is_displayable(model)) {
+      return display_text_for_label(model, "Printer name") + "  " +
+             name.substr(name.size() - std::min<size_t>(4U, name.size()));
+    }
+    return shortened_serial_for_display(name);
+  }
+  return model.empty() ? "Unknown" : display_text_for_label(model, "Printer name");
+}
+
+std::string short_portal_hint_for_display(const PrinterSnapshot& snapshot, bool include_pin) {
+  std::string text;
+  if (snapshot.setup_ap_active) {
+    const std::string ip = snapshot.setup_ap_ip.empty() ? "192.168.4.1" : snapshot.setup_ap_ip;
+    text = "Open " + ip;
+  } else if (!snapshot.wifi_ip.empty()) {
+    text = "Open " + snapshot.wifi_ip;
+  } else if (snapshot.wifi_connected) {
+    text = "Open portal on Wi-Fi IP";
+  }
+  if (include_pin) {
+    if (!text.empty()) {
+      text += " | ";
+    }
+    text += "Hold for PIN";
+  }
+  return text;
 }
 
 std::string preview_note_text(const PrinterSnapshot& snapshot) {
@@ -1466,10 +1650,13 @@ void Ui::compute_portal_texts_locked() {
           "Web Config unlocked for " +
           short_duration_text(std::max<uint32_t>(portal_session_remaining_s_, 1U));
     } else if (provisioning_context) {
-      portal_hint_text_.clear();
+      portal_hint_text_ =
+          kOnxLandscapeLayout ? short_portal_hint_for_display(last_snapshot_, portal_lock_enabled_) : "";
     } else if (!portal_lock_enabled_) {
       portal_hint_text_ =
           station_portal_available ? ("Open " + last_snapshot_.wifi_ip) : "Web Config open";
+    } else if (kOnxLandscapeLayout && last_snapshot_.wifi_connected) {
+      portal_hint_text_ = short_portal_hint_for_display(last_snapshot_, true);
     } else if (portal_hint_boot_ms_ != 0 &&
                static_cast<uint64_t>(esp_timer_get_time() / 1000ULL) <
                    portal_hint_boot_ms_ + kPortalHintIntroMs) {
@@ -1627,10 +1814,15 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
   if (kOnxLandscapeLayout && page0_detail_panel_ != nullptr) {
     set_hidden(page0_detail_panel_, false);
     if (empty) {
+      const std::string portal_hint = short_portal_hint_for_display(last_snapshot_, portal_lock_enabled_);
+      set_label_text_if_changed(page0_empty_note_,
+                                portal_hint.empty()
+                                    ? "No printers configured.\nUse the web portal to add printers."
+                                    : ("No printers configured.\n" + portal_hint));
       set_label_text_if_changed(page0_detail_title_, "No printer");
       set_label_text_if_changed(page0_detail_state_, "No profile");
-      set_label_text_if_changed(page0_detail_host_, "Use Web Config");
-      set_label_text_if_changed(page0_detail_hint_, "Hold for PIN");
+      set_label_text_if_changed(page0_detail_host_, portal_hint.empty() ? "Use Web Config" : portal_hint);
+      set_label_text_if_changed(page0_detail_hint_, portal_pin_active_ ? "PIN active" : "Hold for PIN");
       lv_obj_set_style_text_color(page0_detail_state_, lv_color_hex(kOnxColorMuted), 0);
     } else {
       const PrinterCardInfo* selected = &cards.front();
@@ -1640,18 +1832,22 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
           break;
         }
       }
-      const std::string title = selected->name.empty()
-          ? (selected->model.empty() ? "Printer" : selected->model)
-          : selected->name;
+      const std::string title =
+          printer_primary_title_for_display(selected->name, selected->model);
       const std::string state = selected->connected
           ? "Online"
           : (selected->active ? "Waiting for LAN" : "Profile ready");
-      const std::string host = selected->host.empty() ? "No local IP" : selected->host;
+      std::string host = selected->host.empty() ? "No local IP" : selected->host;
+      if (looks_like_serial(selected->name)) {
+        host = shortened_serial_for_display(selected->name);
+      }
+      const std::string portal_hint = short_portal_hint_for_display(last_snapshot_, portal_lock_enabled_);
       set_label_text_if_changed(page0_detail_title_, title);
       set_label_text_if_changed(page0_detail_state_, state);
       set_label_text_if_changed(page0_detail_host_, host);
       set_label_text_if_changed(page0_detail_hint_,
-                                selected->active ? "Active printer" : "Tap card to select");
+                                !portal_hint.empty() ? portal_hint :
+                                (selected->active ? "Active printer" : "Tap card to select"));
       lv_obj_set_style_text_color(page0_detail_state_,
                                   lv_color_hex(selected->connected ? 0x4ADE80 : kOnxColorMuted),
                                   0);
@@ -1731,7 +1927,9 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
 
     // Printer name (bold, larger)
     lv_obj_t* name_lbl = lv_label_create(card);
-    const std::string display_name = info.name.empty() ? info.model : info.name;
+    const std::string display_name = kOnxLandscapeLayout
+        ? printer_primary_title_for_display(info.name, info.model)
+        : (info.name.empty() ? info.model : info.name);
     set_label_text_if_changed(name_lbl, display_name);
     lv_obj_set_width(name_lbl, kOnxLandscapeLayout ? 210 : (kOnxUiLayout ? 250 : 300));
     lv_label_set_long_mode(name_lbl, LV_LABEL_LONG_DOT);
@@ -1765,7 +1963,10 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
 
     // Model
     lv_obj_t* model_lbl = lv_label_create(card);
-    set_label_text_if_changed(model_lbl, info.model.empty() ? "Unknown" : info.model);
+    const std::string model_text = kOnxLandscapeLayout
+        ? printer_secondary_for_display(info.name, info.model)
+        : (info.model.empty() ? "Unknown" : info.model);
+    set_label_text_if_changed(model_lbl, model_text);
     lv_obj_set_width(model_lbl, kOnxLandscapeLayout ? 260 : (kOnxUiLayout ? 260 : 300));
     lv_label_set_long_mode(model_lbl, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(model_lbl, font_detail, 0);
@@ -1782,6 +1983,9 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
     std::string host_text = info.host.empty() ? "No local IP" : info.host;
     if (kOnxLandscapeLayout) {
       const char* state = info.connected ? "Online" : (info.active ? "Waiting" : "Profile");
+      if (looks_like_serial(info.name)) {
+        host_text = shortened_serial_for_display(info.name);
+      }
       host_text = std::string(state) + " · " + host_text;
     }
     set_label_text_if_changed(host_lbl, host_text);
@@ -2091,10 +2295,16 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
     const std::string job_label =
         !snapshot.job_name.empty() ? snapshot.job_name :
         (!snapshot.gcode_file.empty() ? snapshot.gcode_file : "No active job");
-    set_label_text_if_changed(onx_job_label_, job_label);
+    set_label_text_if_changed(onx_job_label_,
+                              kOnxLandscapeLayout
+                                  ? display_text_for_label(job_label, "Project name")
+                                  : job_label);
   }
 
-  const std::string detail = detail_text(snapshot);
+  const std::string raw_detail = detail_text(snapshot);
+  const std::string detail = raw_detail.empty() || !kOnxLandscapeLayout
+      ? raw_detail
+      : display_text_for_label(raw_detail, "Project name");
 
   // [DIAG] Log what the display is actually showing — on change only.
   if (status_text != last_diag_status_ || detail != last_diag_detail_ ||
@@ -2146,7 +2356,10 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
         snapshot.has_error ? "Error" :
         (!snapshot.stage.empty() ? snapshot.stage :
          (!detail.empty() ? detail : status_text));
-    set_label_text_if_changed(onx_metric_detail_label_, metric_detail);
+    set_label_text_if_changed(onx_metric_detail_label_,
+                              kOnxLandscapeLayout
+                                  ? display_text_for_label(metric_detail, "Project name")
+                                  : metric_detail);
   }
 
   const std::string remaining = show_eta_ ? eta_text(snapshot) : remaining_text(snapshot);
@@ -2306,16 +2519,36 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
   }
   set_hidden(page2_subnote_, preview_subnote.empty());
   if (!preview_subnote.empty()) {
-    set_label_text_if_changed(page2_subnote_, preview_subnote);
+    set_label_text_if_changed(page2_subnote_,
+                              kOnxLandscapeLayout
+                                  ? display_text_for_label(preview_subnote, "Project name")
+                                  : preview_subnote);
   }
   if (kOnxUiLayout && page2_detail_label_ != nullptr) {
     std::string preview_detail;
     if (kOnxLandscapeLayout) {
-      preview_detail = !snapshot.cloud_detail.empty() ? snapshot.cloud_detail : snapshot.preview_hint;
-      if (!preview_note.empty()) {
-        preview_detail = preview_detail.empty()
-            ? preview_note
-            : (preview_note + "\n" + preview_detail);
+      const std::string source =
+          snapshot.preview_source == FieldSource::kNone
+              ? std::string{}
+              : ("Source: " + std::string(to_string(snapshot.preview_source)));
+      const std::string short_detail =
+          !snapshot.cloud_detail.empty() ? snapshot.cloud_detail : snapshot.preview_hint;
+      if (has_page2_image) {
+        preview_detail = source;
+        if (!short_detail.empty()) {
+          preview_detail = preview_detail.empty()
+              ? display_text_for_label(short_detail, "Project name")
+              : (preview_detail + "\n" + display_text_for_label(short_detail, "Project name"));
+        }
+      } else if (!snapshot.preview_url.empty()) {
+        preview_detail = !source.empty() ? source : "Source: cloud";
+        if (!short_detail.empty() && short_detail != "Loading cloud cover") {
+          preview_detail += "\n" + display_text_for_label(short_detail, "Project name");
+        }
+      } else {
+        preview_detail = !short_detail.empty()
+            ? display_text_for_label(short_detail, "Project name")
+            : (!preview_note.empty() ? preview_note : std::string{});
       }
     } else {
       preview_detail =
@@ -3576,7 +3809,7 @@ esp_err_t Ui::build_dashboard() {
     set_label_text_if_changed(page0_detail_host_, "Use Web Config");
     lv_obj_set_pos(page0_detail_host_, 10, 94);
     lv_obj_set_size(page0_detail_host_, 124, 40);
-    lv_label_set_long_mode(page0_detail_host_, LV_LABEL_LONG_WRAP);
+    lv_label_set_long_mode(page0_detail_host_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(page0_detail_host_, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(page0_detail_host_, lv_color_hex(kOnxColorMuted), 0);
 
@@ -3584,7 +3817,7 @@ esp_err_t Ui::build_dashboard() {
     set_label_text_if_changed(page0_detail_hint_, "Hold for PIN");
     lv_obj_set_pos(page0_detail_hint_, 10, 164);
     lv_obj_set_size(page0_detail_hint_, 124, 42);
-    lv_label_set_long_mode(page0_detail_hint_, LV_LABEL_LONG_WRAP);
+    lv_label_set_long_mode(page0_detail_hint_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(page0_detail_hint_, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(page0_detail_hint_, lv_color_hex(kOnxColorSoft), 0);
   }
@@ -4326,7 +4559,7 @@ void Ui::apply_page_visibility() {
   const bool portal_hint_has_priority = portal_pin_active_ || portal_session_active_;
   const bool show_portal_hint =
       settled_page1 && !portal_hint_text_.empty() &&
-      (portal_hint_has_priority || !detail_visible_);
+      (kOnxLandscapeLayout || portal_hint_has_priority || !detail_visible_);
 
   for (int u = 0; u < kMaxAmsUnits; ++u) {
     if (ams_pages_[u] != nullptr) {
@@ -4336,7 +4569,8 @@ void Ui::apply_page_visibility() {
   set_hidden(page2_, !preview_page_available_);
   set_hidden(page3_, !camera_page_available_);
   set_hidden(status_label_, !on_page1);
-  set_hidden(detail_label_, !on_page1 || !detail_visible_ || show_portal_hint);
+  set_hidden(detail_label_, !on_page1 || !detail_visible_ ||
+                            (show_portal_hint && !kOnxLandscapeLayout));
   set_hidden(layer_label_, !on_page1);
   set_hidden(nozzle_prefix_label_, !on_page1);
   set_hidden(nozzle_value_label_, !on_page1);
@@ -4777,7 +5011,7 @@ void Ui::update_portal_access_visuals_locked() {
   const bool show_page1 = !scrolling_ && active_page_ == kPageIdxMain;
   const bool portal_hint_has_priority = portal_pin_active_ || portal_session_active_;
   const bool show_hint = portal_hint_label_ != nullptr && show_page1 && !portal_hint_text_.empty() &&
-                         (portal_hint_has_priority || !detail_visible_);
+                         (kOnxLandscapeLayout || portal_hint_has_priority || !detail_visible_);
   set_hidden(portal_hint_label_, !show_hint);
   if (show_hint) {
     if (kOnxUiLayout) {
@@ -4788,7 +5022,9 @@ void Ui::update_portal_access_visuals_locked() {
                    12, kOnxLandscapeLayout ? 292 : 462);
     }
     set_label_text_if_changed(portal_hint_label_, portal_hint_text_);
-    set_hidden(detail_label_, true);
+    if (!kOnxLandscapeLayout) {
+      set_hidden(detail_label_, true);
+    }
   } else if (detail_label_ != nullptr && show_page1 && detail_visible_) {
     set_hidden(detail_label_, false);
   }
