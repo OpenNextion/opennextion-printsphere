@@ -3,6 +3,10 @@
 [![English](https://img.shields.io/badge/lang-English-blue)](./README.md)
 [![中文](https://img.shields.io/badge/lang-中文-red)](./README.zh-CN.md)
 
+<p align="center">
+  <img src="docs/images/opennextion-printsphere-desk-stand.jpg" alt="OpenNextion-printsphere 搭配 ONX3248G035 桌面支架" width="820">
+</p>
+
 OpenNextion-printsphere 是一个将 [PrintSphere](https://github.com/cptkirki/PrintSphere) 移植到 OpenNextion ESP32 矩形屏幕上的桌面显示屏项目，用于显示 Bambu Lab（拓竹）打印机的打印状态、文件信息、AMS 信息、封面图和摄像头画面等内容。
 
 首个完成适配和验证的屏幕型号是 [ONX3248G035][onx3248g035]。
@@ -46,6 +50,10 @@ OpenNextion-printsphere 是一个将 [PrintSphere](https://github.com/cptkirki/P
 ## 当前验证状态
 
 ### 屏幕验证
+
+<p align="center">
+  <img src="docs/images/onx3248g035-landscape-ui.jpg" alt="ONX3248G035 上运行的 OpenNextion-printsphere 横屏 UI" width="720">
+</p>
 
 - [ONX3248G035][onx3248g035] 可以运行 OpenNextion-printsphere
 - [ONX3248G035][onx3248g035] 横屏配置已完成主要实机验证

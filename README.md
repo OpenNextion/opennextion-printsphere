@@ -3,6 +3,10 @@
 [![English](https://img.shields.io/badge/lang-English-blue)](./README.md)
 [![中文](https://img.shields.io/badge/lang-中文-red)](./README.zh-CN.md)
 
+<p align="center">
+  <img src="docs/images/opennextion-printsphere-desk-stand.jpg" alt="OpenNextion-printsphere desktop stand with ONX3248G035" width="820">
+</p>
+
 OpenNextion-printsphere is a desktop status display project that ports [PrintSphere](https://github.com/cptkirki/PrintSphere) to OpenNextion ESP32 rectangular displays. It is designed to show Bambu Lab printer status, file information, AMS information, cover images, and camera snapshots.
 
 The first adapted and tested display model is [ONX3248G035][onx3248g035].
@@ -46,6 +50,10 @@ This port adds the `onx_cjk_16` LVGL font, generated from Source Han Sans SC. It
 ## Current Validation Status
 
 ### Display Validation
+
+<p align="center">
+  <img src="docs/images/onx3248g035-landscape-ui.jpg" alt="OpenNextion-printsphere landscape UI on ONX3248G035" width="720">
+</p>
 
 - [ONX3248G035][onx3248g035] can run OpenNextion-printsphere
 - [ONX3248G035][onx3248g035] landscape mode has completed the main real-device validation
