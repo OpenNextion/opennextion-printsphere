@@ -104,9 +104,9 @@ constexpr int kOnxMainLeftPanelH = kOnxLandscapeLayout ? 228 : 104;
 constexpr int kOnxPrinterListX = 12;
 constexpr int kOnxPrinterListY = kOnxLandscapeLayout ? 48 : 60;
 constexpr int kOnxPrinterListW = kOnxLandscapeLayout ? 300 : 296;
-constexpr int kOnxPrinterListH = kOnxLandscapeLayout ? 228 : 348;
+constexpr int kOnxPrinterListH = kOnxLandscapeLayout ? 224 : 348;
 constexpr int kOnxPrinterCardW = kOnxLandscapeLayout ? 300 : 296;
-constexpr int kOnxPrinterCardH = kOnxLandscapeLayout ? 66 : 76;
+constexpr int kOnxPrinterCardH = kOnxLandscapeLayout ? 92 : 76;
 constexpr uint32_t kOnxColorBg = 0x050607;
 constexpr uint32_t kOnxColorPanel = 0x111418;
 constexpr uint32_t kOnxColorPanel2 = 0x171B20;
@@ -1126,71 +1126,6 @@ std::string eta_text(const PrinterSnapshot& snapshot) {
   return buffer;
 }
 
-bool utf8_next_codepoint(const std::string& text, size_t* index, uint32_t* codepoint) {
-  if (index == nullptr || codepoint == nullptr || *index >= text.size()) {
-    return false;
-  }
-  const unsigned char c0 = static_cast<unsigned char>(text[*index]);
-  if (c0 < 0x80U) {
-    *codepoint = c0;
-    ++(*index);
-    return true;
-  }
-  uint32_t value = 0;
-  size_t extra = 0;
-  if ((c0 & 0xE0U) == 0xC0U) {
-    value = c0 & 0x1FU;
-    extra = 1;
-  } else if ((c0 & 0xF0U) == 0xE0U) {
-    value = c0 & 0x0FU;
-    extra = 2;
-  } else if ((c0 & 0xF8U) == 0xF0U) {
-    value = c0 & 0x07U;
-    extra = 3;
-  } else {
-    *codepoint = c0;
-    ++(*index);
-    return true;
-  }
-  if (*index + extra >= text.size()) {
-    *codepoint = c0;
-    ++(*index);
-    return true;
-  }
-  for (size_t i = 1; i <= extra; ++i) {
-    const unsigned char cx = static_cast<unsigned char>(text[*index + i]);
-    if ((cx & 0xC0U) != 0x80U) {
-      *codepoint = c0;
-      ++(*index);
-      return true;
-    }
-    value = (value << 6U) | (cx & 0x3FU);
-  }
-  *index += extra + 1U;
-  *codepoint = value;
-  return true;
-}
-
-bool is_cjk_codepoint(uint32_t cp) {
-  return (cp >= 0x3400U && cp <= 0x9FFFU) ||
-         (cp >= 0xF900U && cp <= 0xFAFFU) ||
-         (cp >= 0x20000U && cp <= 0x2A6DFU) ||
-         (cp >= 0x2A700U && cp <= 0x2B73FU) ||
-         (cp >= 0x2B740U && cp <= 0x2B81FU) ||
-         (cp >= 0x2B820U && cp <= 0x2CEAFU);
-}
-
-bool contains_cjk(const std::string& text) {
-  size_t i = 0;
-  uint32_t cp = 0;
-  while (utf8_next_codepoint(text, &i, &cp)) {
-    if (is_cjk_codepoint(cp)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 bool is_visible_ascii(unsigned char c) {
   return c >= 0x21U && c <= 0x7EU;
 }
@@ -1206,30 +1141,50 @@ std::string trim_ascii_fragment(std::string text) {
 }
 
 std::string display_text_for_label(const std::string& raw, const char* semantic_fallback) {
-  if (!contains_cjk(raw)) {
+  bool has_non_ascii = false;
+  for (unsigned char c : raw) {
+    if (c >= 0x80U) {
+      has_non_ascii = true;
+      break;
+    }
+  }
+  if (!has_non_ascii) {
     return raw;
   }
+
   std::string ascii;
   ascii.reserve(raw.size());
   size_t visible_count = 0;
+  bool last_space = true;
   for (unsigned char c : raw) {
-    if (c < 0x80U) {
-      ascii.push_back(static_cast<char>(std::isspace(c) ? ' ' : c));
+    if (c >= 0x20U && c <= 0x7EU) {
+      if (c == ' ') {
+        if (!last_space) {
+          ascii.push_back(' ');
+        }
+        last_space = true;
+      } else {
+        ascii.push_back(static_cast<char>(c));
+        last_space = false;
+      }
       if (is_visible_ascii(c)) {
         ++visible_count;
       }
+    } else if (!last_space) {
+      ascii.push_back(' ');
+      last_space = true;
     }
   }
   ascii = trim_ascii_fragment(ascii);
   if (visible_count < 3 || ascii.empty()) {
-    return std::string(semantic_fallback) + " [CJK]";
+    return std::string(semantic_fallback) + " [UTF8]";
   }
   if (ascii.size() > 24U) {
     const std::string prefix = trim_ascii_fragment(ascii.substr(0, 14));
     const std::string suffix = trim_ascii_fragment(ascii.substr(ascii.size() - 8));
-    return prefix + "..." + suffix + " [CJK]";
+    return prefix + "..." + suffix + " [UTF8]";
   }
-  return ascii + " [CJK]";
+  return ascii + " [UTF8]";
 }
 
 bool looks_like_serial(const std::string& text) {
@@ -1299,6 +1254,13 @@ std::string short_portal_hint_for_display(const PrinterSnapshot& snapshot, bool 
     text += "Hold for PIN";
   }
   return text;
+}
+
+std::string portal_ip_for_display(const PrinterSnapshot& snapshot) {
+  if (snapshot.setup_ap_active) {
+    return snapshot.setup_ap_ip.empty() ? "192.168.4.1" : snapshot.setup_ap_ip;
+  }
+  return snapshot.wifi_ip;
 }
 
 std::string preview_note_text(const PrinterSnapshot& snapshot) {
@@ -1813,16 +1775,18 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
   set_hidden(page0_empty_note_, !empty);
   if (kOnxLandscapeLayout && page0_detail_panel_ != nullptr) {
     set_hidden(page0_detail_panel_, false);
+    const std::string portal_ip = portal_ip_for_display(last_snapshot_);
     if (empty) {
-      const std::string portal_hint = short_portal_hint_for_display(last_snapshot_, portal_lock_enabled_);
       set_label_text_if_changed(page0_empty_note_,
-                                portal_hint.empty()
+                                portal_ip.empty()
                                     ? "No printers configured.\nUse the web portal to add printers."
-                                    : ("No printers configured.\n" + portal_hint));
+                                    : ("No printers configured.\nOpen " + portal_ip));
       set_label_text_if_changed(page0_detail_title_, "No printer");
       set_label_text_if_changed(page0_detail_state_, "No profile");
-      set_label_text_if_changed(page0_detail_host_, portal_hint.empty() ? "Use Web Config" : portal_hint);
-      set_label_text_if_changed(page0_detail_hint_, portal_pin_active_ ? "PIN active" : "Hold for PIN");
+      set_label_text_if_changed(page0_detail_host_, "--");
+      set_label_text_if_changed(page0_detail_hint_, "Web Config");
+      set_label_text_if_changed(page0_detail_ip_, portal_ip.empty() ? "No IP" : portal_ip);
+      set_label_text_if_changed(page0_detail_pin_hint_, portal_pin_active_ ? "PIN active" : "Hold PIN");
       lv_obj_set_style_text_color(page0_detail_state_, lv_color_hex(kOnxColorMuted), 0);
     } else {
       const PrinterCardInfo* selected = &cards.front();
@@ -1841,13 +1805,12 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
       if (looks_like_serial(selected->name)) {
         host = shortened_serial_for_display(selected->name);
       }
-      const std::string portal_hint = short_portal_hint_for_display(last_snapshot_, portal_lock_enabled_);
       set_label_text_if_changed(page0_detail_title_, title);
       set_label_text_if_changed(page0_detail_state_, state);
       set_label_text_if_changed(page0_detail_host_, host);
-      set_label_text_if_changed(page0_detail_hint_,
-                                !portal_hint.empty() ? portal_hint :
-                                (selected->active ? "Active printer" : "Tap card to select"));
+      set_label_text_if_changed(page0_detail_hint_, "Web Config");
+      set_label_text_if_changed(page0_detail_ip_, portal_ip.empty() ? "No IP" : portal_ip);
+      set_label_text_if_changed(page0_detail_pin_hint_, portal_pin_active_ ? "PIN active" : "Hold PIN");
       lv_obj_set_style_text_color(page0_detail_state_,
                                   lv_color_hex(selected->connected ? 0x4ADE80 : kOnxColorMuted),
                                   0);
@@ -1871,7 +1834,7 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
                               lv_color_hex(kOnxUiLayout ? kOnxColorPanel2 : 0x1E1E1E), 0);
     lv_obj_set_style_bg_opa(card, kOnxUiLayout ? LV_OPA_COVER : 195, 0);
     lv_obj_set_style_radius(card, kOnxUiLayout ? 8 : 16, 0);
-    lv_obj_set_style_pad_all(card, kOnxUiLayout ? 10 : 12, 0);
+    lv_obj_set_style_pad_all(card, kOnxLandscapeLayout ? 0 : (kOnxUiLayout ? 10 : 12), 0);
     lv_obj_set_style_pad_row(card, 2, 0);
     lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
     // Shadow for 3D depth on OLED
@@ -1919,7 +1882,7 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
                                    : lv_color_hex(0x666666), 0);
     lv_obj_set_style_border_width(dot, 0, 0);
     lv_obj_align(dot, LV_ALIGN_TOP_RIGHT, kOnxLandscapeLayout ? -10 : 0,
-                 kOnxLandscapeLayout ? 34 : 0);
+                 kOnxLandscapeLayout ? 68 : 0);
     lv_obj_clear_flag(dot, LV_OBJ_FLAG_CLICKABLE);
     if (info.connected) {
       start_dot_pulse(dot);
@@ -1931,13 +1894,17 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
         ? printer_primary_title_for_display(info.name, info.model)
         : (info.name.empty() ? info.model : info.name);
     set_label_text_if_changed(name_lbl, display_name);
-    lv_obj_set_width(name_lbl, kOnxLandscapeLayout ? 210 : (kOnxUiLayout ? 250 : 300));
+    lv_obj_set_width(name_lbl, kOnxLandscapeLayout ? 208 : (kOnxUiLayout ? 250 : 300));
     lv_label_set_long_mode(name_lbl, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(name_lbl, font_name, 0);
     lv_obj_set_style_text_color(name_lbl,
                                 lv_color_hex(kOnxUiLayout ? kOnxColorText : 0xFFFFFF), 0);
-    lv_obj_align(name_lbl, LV_ALIGN_TOP_LEFT, kOnxLandscapeLayout ? 10 : 0,
-                 kOnxLandscapeLayout ? -2 : 0);
+    if (kOnxLandscapeLayout) {
+      lv_obj_set_pos(name_lbl, 12, 10);
+      lv_obj_set_size(name_lbl, 208, 24);
+    } else {
+      lv_obj_align(name_lbl, LV_ALIGN_TOP_LEFT, 0, 0);
+    }
 
     if (kOnxLandscapeLayout) {
       lv_obj_t* pill = lv_label_create(card);
@@ -1957,7 +1924,7 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
       lv_obj_set_style_bg_opa(pill, LV_OPA_COVER, 0);
       lv_obj_set_style_radius(pill, 11, 0);
       lv_obj_set_style_pad_top(pill, 2, 0);
-      lv_obj_align(pill, LV_ALIGN_TOP_RIGHT, -10, 4);
+      lv_obj_align(pill, LV_ALIGN_TOP_RIGHT, -10, 10);
       lv_obj_clear_flag(pill, LV_OBJ_FLAG_CLICKABLE);
     }
 
@@ -1967,13 +1934,14 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
         ? printer_secondary_for_display(info.name, info.model)
         : (info.model.empty() ? "Unknown" : info.model);
     set_label_text_if_changed(model_lbl, model_text);
-    lv_obj_set_width(model_lbl, kOnxLandscapeLayout ? 260 : (kOnxUiLayout ? 260 : 300));
+    lv_obj_set_width(model_lbl, kOnxLandscapeLayout ? 252 : (kOnxUiLayout ? 260 : 300));
     lv_label_set_long_mode(model_lbl, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(model_lbl, font_detail, 0);
     lv_obj_set_style_text_color(model_lbl,
                                 lv_color_hex(kOnxUiLayout ? kOnxColorMuted : 0x888888), 0);
     if (kOnxLandscapeLayout) {
-      lv_obj_align(model_lbl, LV_ALIGN_TOP_LEFT, 10, 25);
+      lv_obj_set_pos(model_lbl, 12, 40);
+      lv_obj_set_size(model_lbl, 252, 18);
     } else {
       lv_obj_align_to(model_lbl, name_lbl, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 2);
     }
@@ -1989,7 +1957,7 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
       host_text = std::string(state) + " · " + host_text;
     }
     set_label_text_if_changed(host_lbl, host_text);
-    lv_obj_set_width(host_lbl, kOnxLandscapeLayout ? 260 : (kOnxUiLayout ? 260 : 300));
+    lv_obj_set_width(host_lbl, kOnxLandscapeLayout ? 252 : (kOnxUiLayout ? 260 : 300));
     lv_label_set_long_mode(host_lbl, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(host_lbl, font_detail, 0);
     lv_obj_set_style_text_color(host_lbl,
@@ -1998,7 +1966,8 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
                                                  : (kOnxUiLayout ? kOnxColorMuted : 0x666666)),
                                 0);
     if (kOnxLandscapeLayout) {
-      lv_obj_align(host_lbl, LV_ALIGN_TOP_LEFT, 10, 44);
+      lv_obj_set_pos(host_lbl, 12, 64);
+      lv_obj_set_size(host_lbl, 252, 18);
     } else {
       lv_obj_align_to(host_lbl, model_lbl, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 2);
     }
@@ -3723,7 +3692,7 @@ esp_err_t Ui::build_dashboard() {
 
   add_onx_page_chrome(page0_, "Printers",
                       kOnxLandscapeLayout ? "Web Config" : "1/8",
-                      kOnxLandscapeLayout ? "Hold for Web Config PIN" : "Hold: Web Config PIN",
+                      kOnxLandscapeLayout ? "" : "Hold: Web Config PIN",
                       dosis20, info20);
   for (int u = 0; u < kMaxAmsUnits; ++u) {
     char ams_title[16] = {};
@@ -3762,7 +3731,7 @@ esp_err_t Ui::build_dashboard() {
   make_transparent(page0_card_list_);
   lv_obj_set_flex_flow(page0_card_list_, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_flex_align(page0_card_list_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  lv_obj_set_style_pad_row(page0_card_list_, kOnxLandscapeLayout ? 8 : 10, 0);
+  lv_obj_set_style_pad_row(page0_card_list_, 10, 0);
   lv_obj_set_style_pad_all(page0_card_list_, 0, 0);
   lv_obj_set_scroll_dir(page0_card_list_, LV_DIR_VER);
   lv_obj_set_scrollbar_mode(page0_card_list_, LV_SCROLLBAR_MODE_OFF);
@@ -3791,35 +3760,51 @@ esp_err_t Ui::build_dashboard() {
 
     page0_detail_title_ = lv_label_create(page0_detail_panel_);
     set_label_text_if_changed(page0_detail_title_, "No printer");
-    lv_obj_set_pos(page0_detail_title_, 10, 12);
-    lv_obj_set_size(page0_detail_title_, 124, 42);
+    lv_obj_set_pos(page0_detail_title_, 12, 12);
+    lv_obj_set_size(page0_detail_title_, 120, 40);
     lv_label_set_long_mode(page0_detail_title_, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_font(page0_detail_title_, dosis20, 0);
     lv_obj_set_style_text_color(page0_detail_title_, lv_color_hex(kOnxColorText), 0);
 
     page0_detail_state_ = lv_label_create(page0_detail_panel_);
     set_label_text_if_changed(page0_detail_state_, "No profile");
-    lv_obj_set_pos(page0_detail_state_, 10, 62);
-    lv_obj_set_size(page0_detail_state_, 124, 22);
+    lv_obj_set_pos(page0_detail_state_, 12, 60);
+    lv_obj_set_size(page0_detail_state_, 120, 20);
     lv_label_set_long_mode(page0_detail_state_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(page0_detail_state_, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(page0_detail_state_, lv_color_hex(kOnxColorMuted), 0);
 
     page0_detail_host_ = lv_label_create(page0_detail_panel_);
-    set_label_text_if_changed(page0_detail_host_, "Use Web Config");
-    lv_obj_set_pos(page0_detail_host_, 10, 94);
-    lv_obj_set_size(page0_detail_host_, 124, 40);
+    set_label_text_if_changed(page0_detail_host_, "--");
+    lv_obj_set_pos(page0_detail_host_, 12, 88);
+    lv_obj_set_size(page0_detail_host_, 120, 20);
     lv_label_set_long_mode(page0_detail_host_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(page0_detail_host_, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(page0_detail_host_, lv_color_hex(kOnxColorMuted), 0);
 
     page0_detail_hint_ = lv_label_create(page0_detail_panel_);
-    set_label_text_if_changed(page0_detail_hint_, "Hold for PIN");
-    lv_obj_set_pos(page0_detail_hint_, 10, 164);
-    lv_obj_set_size(page0_detail_hint_, 124, 42);
+    set_label_text_if_changed(page0_detail_hint_, "Web Config");
+    lv_obj_set_pos(page0_detail_hint_, 12, 120);
+    lv_obj_set_size(page0_detail_hint_, 120, 16);
     lv_label_set_long_mode(page0_detail_hint_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(page0_detail_hint_, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(page0_detail_hint_, lv_color_hex(kOnxColorSoft), 0);
+
+    page0_detail_ip_ = lv_label_create(page0_detail_panel_);
+    set_label_text_if_changed(page0_detail_ip_, "No IP");
+    lv_obj_set_pos(page0_detail_ip_, 12, 138);
+    lv_obj_set_size(page0_detail_ip_, 120, 20);
+    lv_label_set_long_mode(page0_detail_ip_, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_font(page0_detail_ip_, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(page0_detail_ip_, lv_color_hex(kOnxColorMuted), 0);
+
+    page0_detail_pin_hint_ = lv_label_create(page0_detail_panel_);
+    set_label_text_if_changed(page0_detail_pin_hint_, "Hold PIN");
+    lv_obj_set_pos(page0_detail_pin_hint_, 12, 166);
+    lv_obj_set_size(page0_detail_pin_hint_, 120, 18);
+    lv_label_set_long_mode(page0_detail_pin_hint_, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_font(page0_detail_pin_hint_, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(page0_detail_pin_hint_, lv_color_hex(kOnxColorSoft), 0);
   }
 
   // --- AMS pages (one per AMS unit, indices kPageIdxAmsFirst..kPageIdxAmsLast) ---
