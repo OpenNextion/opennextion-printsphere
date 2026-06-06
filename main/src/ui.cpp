@@ -3008,8 +3008,13 @@ void Ui::build_ams_page(int unit_idx) {
       lv_obj_t* arrow = ams_tray_arrow_[unit_idx][i];
 
       if (kOnxLandscapeLayout) {
-        lv_obj_set_pos(col, i * 116, 0);
-        lv_obj_set_size(col, 108, 128);
+        constexpr int kAmsLandscapeTrayX0 = 6;
+        constexpr int kAmsLandscapeTrayW = 105;
+        constexpr int kAmsLandscapeTrayGap = 8;
+        constexpr int kAmsLandscapeTrayH = 128;
+        lv_obj_set_pos(col, kAmsLandscapeTrayX0 + i * (kAmsLandscapeTrayW + kAmsLandscapeTrayGap),
+                       0);
+        lv_obj_set_size(col, kAmsLandscapeTrayW, kAmsLandscapeTrayH);
       } else {
         lv_obj_set_pos(col, (i % 2) * 153, (i / 2) * 112);
         lv_obj_set_size(col, 143, 102);
@@ -3018,7 +3023,7 @@ void Ui::build_ams_page(int unit_idx) {
       lv_obj_clear_flag(col, LV_OBJ_FLAG_CLICKABLE);
 
       lv_obj_set_pos(rect, 0, 0);
-      lv_obj_set_size(rect, kOnxLandscapeLayout ? 108 : 143,
+      lv_obj_set_size(rect, kOnxLandscapeLayout ? 105 : 143,
                       kOnxLandscapeLayout ? 128 : 102);
       lv_obj_set_style_radius(rect, 8, 0);
       lv_obj_set_style_bg_color(rect, lv_color_hex(kOnxColorPanel2), 0);

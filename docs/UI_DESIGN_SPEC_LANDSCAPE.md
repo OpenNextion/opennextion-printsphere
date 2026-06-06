@@ -155,7 +155,7 @@
 | Bambu logo | 视觉 `54 x 54`，触控 `>=60 x 60` | 支持 chamber light 时点击 toggle |
 | Remaining/ETA row | `172 x 56` | 点击切换 remaining/ETA |
 | Camera image | `300 x 224` | 小位移 tap 请求刷新 |
-| AMS tray | `108 x 128` | 第一版 no-op |
+| AMS tray | `105 x 128` | 第一版 no-op |
 | EXT row | `456 x 44` | 第一版 no-op |
 | Cover image | `240 x 240` | no-op |
 | Metric card / error card | 视觉区域 | no-op |
@@ -194,11 +194,11 @@
 |---|---|---|---|
 | title | `x=12,y=10,w=120,h=28` | `18/#F7FAFC/bold` | 无 |
 | meta row | `x=180,y=10,w=288,h=28` | `12/#8B98A8/right` | humidity/temp/page |
-| tray row | `x=12,y=52,w=456,h=132` | grid 4 col, gap `8` | 无 |
-| tray 1 | `x=12,y=52,w=108,h=128` | material color bg | no-op |
-| tray 2 | `x=128,y=52,w=108,h=128` | material color bg | no-op |
-| tray 3 | `x=244,y=52,w=108,h=128` | material color bg | no-op |
-| tray 4 | `x=360,y=52,w=108,h=128` | material color bg | no-op |
+| tray row | `x=12,y=52,w=456,h=132` | grid 4 col, gap `8`, total `444`, inner offset `6` | 不得露出相邻页 |
+| tray 1 | `x=18,y=52,w=105,h=128` | material color bg | no-op |
+| tray 2 | `x=131,y=52,w=105,h=128` | material color bg | no-op |
+| tray 3 | `x=244,y=52,w=105,h=128` | material color bg | no-op |
+| tray 4 | `x=357,y=52,w=105,h=128` | material color bg; right edge `462` | no-op |
 | tray material | tray 内 `x=8,y=10,w=92,h=24` | `20/bold`, auto black/white | 单行省略 |
 | tray brand/name | tray 内 `x=8,y=38,w=92,h=16` | `12`, auto black/white | 单行省略 |
 | tray percent | tray 内 `x=8,y=96,w=56,h=24` | `20/bold`, auto black/white | `--` if unknown |
@@ -332,7 +332,7 @@
 |---|---|---|
 | topbar | `x=12,y=10,w=456,h=28` | `AMS n`、湿度、温度、页码 |
 | tray row | `x=12,y=52,w=456,h=132` | 4 个槽位横排 |
-| 单槽 | `w=105,h=128,gap=8` | 材料、品牌/名称、余量、active/error |
+| 单槽 | `w=105,h=128,gap=8`；row 内 `x=6,119,232,345`，绝对 `x=18,131,244,357` | 材料、品牌/名称、余量、active/error；第 4 槽 right edge `462` |
 | EXT row | `x=12,y=196,w=456,h=44` | 仅 AMS 1 且外置料卷 active |
 | note/error | `x=12,y=248,w=456,h=36` | AMS 错误摘要或说明 |
 
