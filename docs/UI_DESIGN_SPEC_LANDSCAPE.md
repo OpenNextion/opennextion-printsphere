@@ -536,6 +536,118 @@ Overlay 优先级不变：
 
 不确定或未直接绑定的内容必须标记“待前端线程在代码中确认”，不能凭空定义协议字段。
 
+## H2C Cloud 实机补充规范
+
+本节来自 H2C Cloud 实机联调后的 UI handoff。App/Protocol 侧已验证 CN Cloud 登录、H2C Cloud MQTT 状态/AMS/进度/层数、Cover PNG 下载/缓存/解码和 Printer 页 cloud fallback card 数据链路可用；以下问题不得再归因到协议层，后续实现线程必须在横屏 UI/layout/text 层处理。
+
+### 根因分类
+
+| 问题 | 分类 | 设计判断 |
+|---|---|---|
+| CJK 文件名/标题显示方框 | 字体资源/glyph coverage 问题 | 协议数据已是 UTF-8 并到达 UI；当前字体缺少 CJK 字形时不得直接显示 tofu boxes |
+| Printer 页 cloud serial 过长 | 布局/文案优先级问题 | cloud-only 无本地 profile 时 serial 可作为数据来源，但不能作为大标题完整显示 |
+| Cover title/detail/loading 冲突 | 布局/状态优先级问题 | image blob 已可显示后，loading 文案不得继续占据或覆盖主要视觉状态 |
+| Wi-Fi/Web Config 横屏不可发现 | 横屏移植漏项 | 原 UI 已有 AP/IP/PIN 文案语义；横屏必须在 Printer/Main 持续暴露入口，而不是只依赖开机 intro hint |
+
+### CJK 文本策略
+
+优先方案：引入小型 CJK 字体子集，用于任务名、Cover title、Printer display name 等真实用户输入文本。字体子集应只覆盖 UI 需要的简体中文常用字、ASCII、数字、常见标点和符号，避免为 demo-first 阶段引入全量大字体。字体资产方案由 UI Implementation 线程另行评估内存占用后回报主线程确认。
+
+Demo fallback：如果第一版无法安全引入 CJK 字体子集，UI 必须做 CJK-aware display fallback：
+
+- 不修改 `PrinterSnapshot` 或协议原始字符串，只在 label display helper 中处理。
+- 对含 CJK 且当前字体不支持的字符串，优先保留可显示的 ASCII/数字/标点前缀和后缀，中间用 `...` 省略，并追加短标记 `[CJK]`；例如 `OpenNextion3.5... [CJK]`。
+- 如果字符串几乎全为不可显示 CJK，显示语义 fallback：任务/Cover 用 `Project name [CJK]`，Printer name 用 `Printer name [CJK]`，不得显示整行方框。
+- serial、IP、温度、进度、层数、PIN 等机器字段不走 CJK fallback，按原 ASCII 显示。
+- CJK fallback 后仍必须应用本规范的 width/long mode/行数限制。
+
+必须纳入 CJK 策略的文本源：
+
+| UI 文本 | 现有来源 | 横屏显示要求 |
+|---|---|---|
+| Cover title | `preview_subnote_text(snapshot)`：`job_name`、`preview_title`、`cloud_detail`、`preview_hint` | `x=276,y=60,w=180,h=72`，最多 2 行优先，CJK 不得显示方框 |
+| Main job title | `job_name`，fallback `gcode_file`、`preview_title` 待实现线程按现有代码确认 | `x=220,y=48,w=248,h=38`，最多 2 行，CJK fallback 后不得遮挡 layer |
+| Printer card name | `Ui::PrinterCardInfo.name`、`model`、cloud fallback 名称 | card 内 `x=10,y=8,w=210,h=20`，单行 DOT |
+| Printer detail title | active `PrinterCardInfo` name/model/cloud fallback | detail panel 内标题最多 2 行，优先不显示 raw serial |
+| Detail/error 普通文案 | `detail_text(snapshot)`、`cloud_detail`、`preview_hint` | 可 WRAP 但不得超过对应 label 高度；错误/HMS 优先短摘要 |
+| Setup SSID | `setup_access_text(snapshot)` 中 `setup_ap_ssid` | 若 SSID 含 CJK，AP 行可 fallback，但 `PW` 与 `Open <ip>` 必须完整可读 |
+
+### Printer 页 cloud serial 策略
+
+cloud-only 无本地 profile 时，允许用 cloud resolved serial 生成卡片，但横屏显示优先级必须固定如下：
+
+1. Primary title：用户昵称/display name 优先；其次 printer model/family；如果只有 serial，显示 `Cloud printer`，不得把完整 serial 放到 primary title。
+2. Secondary line：显示 model + shortened serial；如果 model 未知，显示 `SN <head6>...<tail4>`。
+3. Detail panel：标题同 primary；state 显示 `Online`、`Waiting for LAN`、`Profile ready` 等短状态；host/serial 行使用 shortened serial 或 local IP，不得换行显示完整 serial。
+4. Active badge/pill 固定 `h=22,min_w=32`，不得被 serial 挤压。若空间不足，缩短 serial，不缩小触控卡片。
+
+推荐 shortening 规则：
+
+| 原始字段 | 显示 |
+|---|---|
+| serial 长度 `<= 12` | 原样显示 |
+| serial 长度 `> 12` | `SN ` + 前 6 字符 + `...` + 后 4 字符 |
+| 有 model + serial | `<model>  ` + 后 4 字符，或 detail 中 `SN <head6>...<tail4>` |
+| 无 nickname/model，仅 serial | title `Cloud printer`，secondary `SN <head6>...<tail4>` |
+
+横屏坐标约束：
+
+| 元素 | 坐标/尺寸 | long mode |
+|---|---|---|
+| card primary | card 内 `x=10,y=8,w=210,h=20` | `DOT` 1 行 |
+| card secondary/model/serial | card 内 `x=10,y=31,w=260,h=14` | `DOT` 1 行 |
+| card state | card 内 `x=10,y=48,w=260,h=14` | `DOT` 1 行 |
+| detail title | detail panel 内 `x=336,y=60,w=120,h=44` | `WRAP` 最多 2 行；raw serial 禁止 |
+| detail state | detail panel 内 `x=336,y=112,w=120,h=22` | `DOT` 1 行 |
+| detail host/serial | detail panel 内 `x=336,y=144,w=120,h=38` | `DOT` 1 行优先；最多 2 行 |
+| detail hint | detail panel 内 `x=336,y=226,w=120,h=22` | `DOT` 1 行 |
+
+### Cover title/detail/loading 优先级
+
+Cover 页必须按状态优先级渲染，不允许多个状态文案同时竞争主视觉：
+
+| 状态 | image box | cover title | detail lines |
+|---|---|---|---|
+| `preview_blob` 已解码且 image visible | 显示 contain image | 显示 job/preview title；CJK 策略后最多 2 行优先 | 不显示 `Loading cloud cover`；只显示 source/material/短 cloud detail |
+| 有 `preview_url` 但无 blob | image box 中心显示 `Loading cloud cover` | 若已有 title 可显示在右侧 | detail 不重复 loading；可显示 `Source: cloud` 或短错误 |
+| 无图但打印中/准备中 | image box 中心显示 `Preparing cover` | 显示 job/preview title | detail 显示 source/detail |
+| offline/setup | image box 中心显示 `Printer offline` 或 `Set up printer` | title 可隐藏 | detail 优先显示 AP/IP/Web Config 访问提示 |
+| error/HMS | image box 如有图仍显示图 | title 保留 | error/detail 只用短摘要，不覆盖 title |
+
+实现约束：
+
+- `preview_note_text(snapshot)` 在 `preview_blob` 非空且 image visible 后必须为空；横屏上 `page2_note_` 应隐藏。
+- `Loading cloud cover` 只能出现在 image box 无图状态，不能同时出现在右侧 detail。
+- `page2_detail_label_` 横屏 `x=276,y=142,w=180,h=96`，只允许短 detail，不得把 title、loading、HMS 长句全部拼接。
+- 验收日志出现 `ui preview set_src raw` 或等效 image set_src 后，Cover 页必须显示图片并且屏幕上没有 `Loading cloud cover`。
+
+### Wi-Fi / Web Config 横屏可发现性
+
+横屏必须保留原项目 Web Config/PIN 交互语义：长按 PIN 不变，UI 不生成 PIN，不新增 Web Config API。UI 只展示现有 `setup_access_text(snapshot)`、`station_portal_text(snapshot)`、portal state 和 `wifi_ip` 派生出的提示。
+
+强制显示规则：
+
+| 状态 | Printer 页 | Main 页 | topbar |
+|---|---|---|---|
+| setup AP active | 空态/详情面板必须显示 `AP: <ssid>`、`PW: <password>`、`Open <setup_ap_ip or 192.168.4.1>` | bottom portal hint 显示 `AP <ssid>  Open <ip>` 或 `Open 192.168.4.1` | 可显示 `Setup AP`，不得替代 IP 行 |
+| waiting credentials，AP inactive，Wi-Fi connected | 详情面板显示 `Open <wifi_ip>` 或 `Open the portal on your Wi-Fi IP` | bottom portal hint 持续显示 `Open <wifi_ip>` | 可显示 `Web <wifi_ip>` |
+| Wi-Fi connected 但 printer/cloud/source 未完成 | 详情面板显示 active source 状态 + `Open <wifi_ip> | Hold PIN` | bottom portal hint 持续显示 `Open <wifi_ip> | Hold for PIN`，不能只在开机 intro 时间内显示 | 若无更高优先级错误，右侧 meta 显示 `Web <wifi_ip>` |
+| portal unlocked/session active | 详情面板显示 `Web Config unlocked` + `Open <wifi_ip>` | bottom hint 显示 `Web Config unlocked <remaining>` | 可显示 `Web unlocked` |
+| PIN active | PIN overlay 显示原 PIN/title/detail | 页面底部 hint 可显示 `Enter the PIN shown` | overlay 优先于 topbar |
+| Wi-Fi disconnected 且无 setup AP | 显示 `No Wi-Fi` / `Use Web Config when available` | 可显示 `Hold for PIN`，但不能伪造 IP | `Offline` |
+
+横屏 discoverability 验收重点：用户通过 setup AP 输入 Wi-Fi 密码后设备重启，若已获得 station `wifi_ip`，不需要等待开机 intro，也不需要猜 IP；在 Printer 页空态/详情面板和 Main 页底部都能看到访问 Web Config 的 IP 或 PIN 提示。
+
+### UI Implementation 执行指令草案
+
+交给 UI Implementation 线程时，代码范围应限定为：
+
+- 允许：`main/src/ui.cpp` 中横屏 label 文案、坐标、long mode、portal hint 可见性、Cover/Printer text priority、可选 display helper。
+- 如确有必要：`main/include/printsphere/ui.hpp` 中增加 UI 内部 helper 声明或 layout profile 常量。
+- 禁止：`components/**`、BSP、cloud/local protocol client、Web Config/setup portal、证书、NVS schema、构建脚本、sdkconfig。
+
+实现线程不得新增协议字段或控制命令；所有显示均从现有 snapshot/card/portal state 派生。若某字段来源不明确，必须回报主线程/设计线程确认，不得自行改 App/Protocol。
+
 ## 实现边界
 
 - 横屏应作为 layout profile 实现，例如 `ONX portrait` 与 `ONX landscape` 两套坐标/构建 profile。
@@ -555,11 +667,15 @@ Overlay 优先级不变：
 | detail/error | 普通态最多 2 行 `WRAP`；错误可短 marquee，但避免大面积滚动 |
 | Main metric label/value | label/value 均 `DOT` 1 行；value 优先，aux 可隐藏 |
 | Main metric aux | 默认隐藏；显示时 `DOT` 1 行且不得与 value 同坐标 |
-| printer host/model | `DOT`，1 行 |
+| printer title/name | 优先 nickname/model；raw serial 不做标题；CJK 不支持时用 display fallback |
+| printer host/model/serial | `DOT`，1 行；serial 使用 `SN <head6>...<tail4>` 或 model + tail |
 | material name | `DOT`，1 行；材料类型必须保留 |
+| Cover title | CJK 策略后最多 2 行优先；不得显示 tofu boxes；不得遮挡 detail |
+| Cover loading/detail | 有 image blob 时隐藏 loading；detail 只显示短 source/detail，不拼接长 loading |
 | Camera image-mode status/layer/source/refresh/tap | 全部 `DOT`，各 1 行；右栏不允许 `WRAP` 长句 |
 | Camera no-image 主提示 | 图像框中央 `WRAP`，最多 2 行 |
 | Camera bottom hint | image mode 隐藏；无图/错误态 `DOT` 1 行 |
+| Web Config/IP hint | AP/IP/PIN 访问提示优先可读；IP、密码、PIN 不得因省略策略丢失关键字段 |
 
 ## 主线程交接与开发分片建议
 
@@ -571,9 +687,10 @@ Overlay 优先级不变：
 | L2 Main page | 实现 Main 左状态卡 + 右信息区；按实机修订使用 `120 x 52` metric card、隐藏冲突 aux | 仅 UI 页面对象与坐标 | 进度、状态、任务名、层数、温度、remaining/ETA、logo/light 都不重叠 |
 | L3 Printer + pager | Printer Select 横屏列表和离散左右翻页 | UI 页面对象/事件 | card 切换、禁用页 skip/clamp、首触唤醒/亮度/PIN 不回归 |
 | L4 AMS | AMS 横向四槽 row + EXT + error/no-op 边界 | UI AMS 布局/render | 1-4 AMS 按 count 启用；tray 点击 no-op |
-| L5 Cover | Cover 左图右文 | UI preview image bounds/text | `preview_blob` contain，no image/offline/loading 文案正确 |
+| L5 Cover | Cover 左图右文、CJK/fallback、loading/detail 优先级 | UI preview image bounds/text | `preview_blob` contain；image visible 后 loading 消失；CJK 不显示方框 |
 | L6 Camera | Camera `300 x 224` + 去重后的 info panel；image mode 隐藏 bottom hint | UI camera bounds/text | tap refresh 请求，离开/禁用释放图像，缓存策略不增加 |
-| L7 overlays/regression | PIN、brightness、portal hint、错误态、文本溢出总验收 | UI overlay/text only | 按本文档验收用例通过 |
+| L7 Cloud text + portal regression | H2C cloud serial、Cover title、Web Config/AP/IP 可发现性 | UI text/layout only | 长 serial 不撑爆；Printer/Main 可持续看到 Web Config 入口 |
+| L8 overlays/regression | PIN、brightness、portal hint、错误态、文本溢出总验收 | UI overlay/text only | 按本文档验收用例通过 |
 
 开发线程必须在每个 slice 回报：修改文件、是否触及非 UI 代码、截图/实机照片或日志证据、未通过项。主线程再决定是否进入下一 slice。
 
@@ -589,6 +706,7 @@ Overlay 优先级不变：
 - Camera 大图 + 右侧信息面板 + tap refresh。
 - Brightness overlay、PIN overlay。
 - no-op 边界。
+- H2C Cloud demo 文本策略：CJK 字体子集或明确 fallback 二选一；cloud serial shortened；Cover image visible 后隐藏 loading；横屏 Printer/Main 可发现 Web Config IP/PIN。
 
 可后续：
 
@@ -596,6 +714,7 @@ Overlay 优先级不变：
 - 更复杂的横屏页面指示器。
 - 小圆弧进度样式。
 - 扩展 MDI glyph。
+- 全量 CJK 字库；第一版只要求小子集或 fallback，不要求覆盖全部 Unicode CJK。
 - 横屏/竖屏运行时切换；第一版可编译期选择。
 
 ## 验收标准
@@ -614,6 +733,10 @@ Overlay 优先级不变：
 - 横屏根画布、pager、overlay、图片 bounds 使用 `480 x 320`。
 - 禁用页 skip/clamp 行为与竖屏一致。
 - 所有文本在 480 x 320 内不重叠、不越界；Main metric 和 Camera right panel 必须用实机修订后的 long mode/短文案策略。
+- H2C Cloud 场景下 CJK 文件名/标题不得显示成连续方框；若未引入 CJK 字体，必须显示 fallback 文案并保留 ASCII 前后缀。
+- Printer 页 cloud-only serial 不得作为完整大标题换行；卡片和详情面板必须使用 nickname/model 优先和 shortened serial。
+- Cover 页在 `preview_blob` 已 set_src/visible 后必须隐藏 `Loading cloud cover`；title/detail/source 不重叠。
+- setup AP、waiting credentials、Wi-Fi connected but source not ready、portal unlocked/PIN active 等状态下，Printer 页和 Main 页必须可发现 `Open <ip>` 或 PIN 提示。
 - AMS tray、Cover image、指标卡片、错误面板点击 no-op。
 - 相机页不增加超过现有策略的图片缓存。
 
@@ -628,6 +751,7 @@ Overlay 优先级不变：
 - Remaining/ETA 行可切换。
 - Camera 页 tap refresh 请求生效。
 - 禁用 Cover/Camera/AMS 页不可达。
+- AP 配网后重启且拿到 station IP 时，横屏不依赖 intro timeout；在 Printer 页空态/详情面板与 Main 页底部都能读到 Web Config 访问入口。
 
 ## 已确认的横屏设计决策
 
