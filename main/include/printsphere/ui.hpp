@@ -234,6 +234,7 @@ class Ui {
   lv_obj_t* page3_shell_ = nullptr;
   lv_obj_t* page3_info_panel_ = nullptr;
   lv_obj_t* page3_info_hint_ = nullptr;
+  lv_obj_t* page3_refresh_label_ = nullptr;
   lv_obj_t* page3_source_label_ = nullptr;
   lv_obj_t* page3_image_ = nullptr;
   lv_obj_t* page3_note_ = nullptr;

@@ -2391,7 +2391,7 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
         lv_obj_set_pos(page3_note_, kOnxLandscapeLayout ? 336 : 12,
                        kOnxLandscapeLayout ? 60 : 48);
         lv_obj_set_size(page3_note_, kOnxLandscapeLayout ? 120 : 180,
-                        kOnxLandscapeLayout ? 28 : 30);
+                        kOnxLandscapeLayout ? 24 : 30);
         lv_obj_set_width(page3_note_, kOnxLandscapeLayout ? 120 : 180);
         lv_label_set_long_mode(page3_note_, LV_LABEL_LONG_DOT);
         lv_obj_set_style_text_align(page3_note_, LV_TEXT_ALIGN_LEFT, 0);
@@ -2422,7 +2422,7 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
       lv_obj_set_pos(page3_subnote_, kOnxLandscapeLayout ? 12 : 0,
                      kOnxLandscapeLayout ? 90 : 0);
       lv_obj_set_size(page3_subnote_, kOnxLandscapeLayout ? 120 : 276,
-                      kOnxLandscapeLayout ? 28 : 36);
+                      kOnxLandscapeLayout ? 24 : 36);
       lv_obj_set_width(page3_subnote_, kOnxLandscapeLayout ? 120 : 276);
       lv_label_set_long_mode(page3_subnote_,
                              kOnxLandscapeLayout ? LV_LABEL_LONG_DOT : LV_LABEL_LONG_WRAP);
@@ -2443,8 +2443,11 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
       lv_obj_set_style_text_color(page3_note_, lv_color_hex(kOnxColorSoft), 0);
     }
   }
-  set_hidden(page3_subnote_, camera_subnote.empty());
-  if (!camera_subnote.empty()) {
+  const bool show_camera_subnote =
+      !camera_subnote.empty() &&
+      !(kOnxLandscapeLayout && !has_camera_image && camera_subnote == "Auto-refresh every 2s");
+  set_hidden(page3_subnote_, !show_camera_subnote);
+  if (show_camera_subnote) {
     // Use the same large font as the main-page layer label when showing
     // "Layer: X / Y", fall back to the regular small font otherwise.
     const bool subnote_is_layer =
@@ -2458,8 +2461,10 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
   if (kOnxLandscapeLayout && page3_source_label_ != nullptr) {
     std::string source_text = "Source: ";
     source_text += snapshot.camera_source == FieldSource::kNone ? "waiting" : to_string(snapshot.camera_source);
-    source_text += "\nAuto-refresh while open";
     set_label_text_if_changed(page3_source_label_, source_text);
+  }
+  if (kOnxLandscapeLayout && page3_refresh_label_ != nullptr) {
+    set_label_text_if_changed(page3_refresh_label_, "Auto 2s");
   }
 
   show_logo_ = should_show_logo(snapshot);
@@ -3496,7 +3501,9 @@ esp_err_t Ui::build_dashboard() {
                         dosis20, info20);
   }
   add_onx_page_chrome(page2_, "Cover", "7/8", "Cover image is display-only", dosis20, info20);
-  add_onx_page_chrome(page3_, "Camera", "8/8", "Tap image area to refresh", dosis20, info20);
+  add_onx_page_chrome(page3_, "Camera", "8/8",
+                      kOnxLandscapeLayout ? "" : "Tap image area to refresh",
+                      dosis20, info20);
 
   // --- Page 0: printer selection ---
   page0_title_ = lv_label_create(page0_);
@@ -3828,9 +3835,9 @@ esp_err_t Ui::build_dashboard() {
     onx_job_label_ = lv_label_create(page1_);
     set_label_text_if_changed(onx_job_label_, "Waiting for printer data");
     lv_obj_set_pos(onx_job_label_, kOnxLandscapeLayout ? 220 : 90,
-                   kOnxLandscapeLayout ? 50 : 54);
+                   kOnxLandscapeLayout ? 48 : 54);
     lv_obj_set_size(onx_job_label_, kOnxLandscapeLayout ? 248 : 218,
-                    kOnxLandscapeLayout ? 44 : 42);
+                    kOnxLandscapeLayout ? 38 : 42);
     lv_label_set_long_mode(onx_job_label_, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_font(onx_job_label_, dosis20, 0);
     lv_obj_set_style_text_color(onx_job_label_, lv_color_hex(kOnxColorText), 0);
@@ -3838,15 +3845,15 @@ esp_err_t Ui::build_dashboard() {
     if (kOnxLandscapeLayout) {
       onx_layer_line_label_ = lv_label_create(page1_);
       set_label_text_if_changed(onx_layer_line_label_, "Layer: -- / --");
-      lv_obj_set_pos(onx_layer_line_label_, 220, 98);
-      lv_obj_set_size(onx_layer_line_label_, 248, 20);
+      lv_obj_set_pos(onx_layer_line_label_, 220, 90);
+      lv_obj_set_size(onx_layer_line_label_, 248, 18);
       lv_label_set_long_mode(onx_layer_line_label_, LV_LABEL_LONG_DOT);
       lv_obj_set_style_text_align(onx_layer_line_label_, LV_TEXT_ALIGN_LEFT, 0);
       lv_obj_set_style_text_font(onx_layer_line_label_, info20, 0);
       lv_obj_set_style_text_color(onx_layer_line_label_, lv_color_hex(kOnxColorSoft), 0);
 
-      lv_obj_set_pos(detail_label_, 220, 222);
-      lv_obj_set_size(detail_label_, 248, 54);
+      lv_obj_set_pos(detail_label_, 220, 232);
+      lv_obj_set_size(detail_label_, 248, 44);
       lv_label_set_long_mode(detail_label_, LV_LABEL_LONG_WRAP);
       lv_obj_set_style_text_align(detail_label_, LV_TEXT_ALIGN_LEFT, 0);
       lv_obj_set_style_text_font(detail_label_, &lv_font_montserrat_14, 0);
@@ -3858,7 +3865,7 @@ esp_err_t Ui::build_dashboard() {
       lv_obj_set_style_border_width(detail_label_, 1, 0);
       lv_obj_set_style_radius(detail_label_, 8, 0);
       lv_obj_set_style_pad_hor(detail_label_, 10, 0);
-      lv_obj_set_style_pad_ver(detail_label_, 8, 0);
+      lv_obj_set_style_pad_ver(detail_label_, 6, 0);
     } else {
       lv_obj_set_size(detail_label_, 218, 18);
       lv_obj_align(detail_label_, LV_ALIGN_TOP_LEFT, 90, 96);
@@ -3902,76 +3909,82 @@ esp_err_t Ui::build_dashboard() {
 
     onx_nozzle_card_ = create_onx_panel(page1_,
                                         kOnxLandscapeLayout ? 220 : 12,
-                                        kOnxLandscapeLayout ? 132 : 258,
+                                        kOnxLandscapeLayout ? 112 : 258,
                                         kOnxLandscapeLayout ? 120 : 143,
-                                        kOnxLandscapeLayout ? 38 : 66,
+                                        kOnxLandscapeLayout ? 52 : 66,
                                         kOnxColorPanel2);
     onx_bed_card_ = create_onx_panel(page1_,
                                      kOnxLandscapeLayout ? 348 : 165,
-                                     kOnxLandscapeLayout ? 132 : 258,
+                                     kOnxLandscapeLayout ? 112 : 258,
                                      kOnxLandscapeLayout ? 120 : 143,
-                                     kOnxLandscapeLayout ? 38 : 66,
+                                     kOnxLandscapeLayout ? 52 : 66,
                                      kOnxColorPanel2);
     onx_layer_card_ = create_onx_panel(page1_,
                                        kOnxLandscapeLayout ? 220 : 12,
-                                       kOnxLandscapeLayout ? 178 : 334,
+                                       kOnxLandscapeLayout ? 172 : 334,
                                        kOnxLandscapeLayout ? 120 : 143,
-                                       kOnxLandscapeLayout ? 38 : 66,
+                                       kOnxLandscapeLayout ? 52 : 66,
                                        kOnxColorPanel2);
     onx_detail_card_ = create_onx_panel(page1_,
                                         kOnxLandscapeLayout ? 348 : 165,
-                                        kOnxLandscapeLayout ? 178 : 334,
+                                        kOnxLandscapeLayout ? 172 : 334,
                                         kOnxLandscapeLayout ? 120 : 143,
-                                        kOnxLandscapeLayout ? 38 : 66,
+                                        kOnxLandscapeLayout ? 52 : 66,
                                         kOnxColorPanel2);
-    create_onx_caption(onx_nozzle_card_, "Nozzle", 8, kOnxLandscapeLayout ? 3 : 8,
+    create_onx_caption(onx_nozzle_card_, "Nozzle", 8, kOnxLandscapeLayout ? 5 : 8,
                        kOnxLandscapeLayout ? 104 : 123, &lv_font_montserrat_14);
-    create_onx_caption(onx_bed_card_, "Bed", 8, kOnxLandscapeLayout ? 3 : 8,
+    create_onx_caption(onx_bed_card_, "Bed", 8, kOnxLandscapeLayout ? 5 : 8,
                        kOnxLandscapeLayout ? 104 : 123, &lv_font_montserrat_14);
-    create_onx_caption(onx_layer_card_, "Layer", 8, kOnxLandscapeLayout ? 3 : 8,
+    create_onx_caption(onx_layer_card_, "Layer", 8, kOnxLandscapeLayout ? 5 : 8,
                        kOnxLandscapeLayout ? 104 : 123, &lv_font_montserrat_14);
-    create_onx_caption(onx_detail_card_, "Detail", 8, kOnxLandscapeLayout ? 3 : 8,
+    create_onx_caption(onx_detail_card_, "Detail", 8, kOnxLandscapeLayout ? 5 : 8,
                        kOnxLandscapeLayout ? 104 : 123, &lv_font_montserrat_14);
 
     lv_obj_set_parent(nozzle_value_label_, onx_nozzle_card_);
-    lv_obj_align(nozzle_value_label_, LV_ALIGN_TOP_LEFT, 8, kOnxLandscapeLayout ? 18 : 32);
+    lv_obj_align(nozzle_value_label_, LV_ALIGN_TOP_LEFT, 8, kOnxLandscapeLayout ? 23 : 32);
     lv_obj_set_size(nozzle_value_label_, kOnxLandscapeLayout ? 104 : 123,
-                    kOnxLandscapeLayout ? 18 : 24);
+                    kOnxLandscapeLayout ? 20 : 24);
     lv_label_set_long_mode(nozzle_value_label_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(nozzle_value_label_, dosis20, 0);
     lv_obj_set_style_text_align(nozzle_value_label_, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_parent(nozzle_aux_label_, onx_nozzle_card_);
-    lv_obj_align(nozzle_aux_label_, LV_ALIGN_TOP_LEFT, 74, 11);
-    lv_obj_set_width(nozzle_aux_label_, 58);
+    lv_obj_align(nozzle_aux_label_, LV_ALIGN_TOP_LEFT,
+                 kOnxLandscapeLayout ? 66 : 74,
+                 kOnxLandscapeLayout ? 23 : 11);
+    lv_obj_set_width(nozzle_aux_label_, kOnxLandscapeLayout ? 46 : 58);
+    lv_label_set_long_mode(nozzle_aux_label_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_align(nozzle_aux_label_, LV_TEXT_ALIGN_RIGHT, 0);
     set_hidden(nozzle_prefix_label_, true);
 
     lv_obj_set_parent(bed_value_label_, onx_bed_card_);
-    lv_obj_align(bed_value_label_, LV_ALIGN_TOP_LEFT, 8, kOnxLandscapeLayout ? 18 : 32);
+    lv_obj_align(bed_value_label_, LV_ALIGN_TOP_LEFT, 8, kOnxLandscapeLayout ? 23 : 32);
     lv_obj_set_size(bed_value_label_, kOnxLandscapeLayout ? 104 : 123,
-                    kOnxLandscapeLayout ? 18 : 24);
+                    kOnxLandscapeLayout ? 20 : 24);
     lv_label_set_long_mode(bed_value_label_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(bed_value_label_, dosis20, 0);
     lv_obj_set_style_text_align(bed_value_label_, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_parent(bed_aux_label_, onx_bed_card_);
-    lv_obj_align(bed_aux_label_, LV_ALIGN_TOP_LEFT, 46, 11);
-    lv_obj_set_width(bed_aux_label_, 88);
+    lv_obj_align(bed_aux_label_, LV_ALIGN_TOP_LEFT,
+                 kOnxLandscapeLayout ? 66 : 46,
+                 kOnxLandscapeLayout ? 23 : 11);
+    lv_obj_set_width(bed_aux_label_, kOnxLandscapeLayout ? 46 : 88);
+    lv_label_set_long_mode(bed_aux_label_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_align(bed_aux_label_, LV_TEXT_ALIGN_RIGHT, 0);
     set_hidden(bed_prefix_label_, true);
 
     lv_obj_set_parent(layer_label_, onx_layer_card_);
-    lv_obj_align(layer_label_, LV_ALIGN_TOP_LEFT, 8, kOnxLandscapeLayout ? 18 : 32);
+    lv_obj_align(layer_label_, LV_ALIGN_TOP_LEFT, 8, kOnxLandscapeLayout ? 23 : 32);
     lv_obj_set_size(layer_label_, kOnxLandscapeLayout ? 104 : 123,
-                    kOnxLandscapeLayout ? 18 : 24);
+                    kOnxLandscapeLayout ? 20 : 24);
     lv_label_set_long_mode(layer_label_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(layer_label_, dosis20, 0);
     lv_obj_set_style_text_align(layer_label_, LV_TEXT_ALIGN_LEFT, 0);
 
     onx_metric_detail_label_ = lv_label_create(onx_detail_card_);
     set_label_text_if_changed(onx_metric_detail_label_, "Waiting");
-    lv_obj_align(onx_metric_detail_label_, LV_ALIGN_TOP_LEFT, 8, kOnxLandscapeLayout ? 18 : 32);
+    lv_obj_align(onx_metric_detail_label_, LV_ALIGN_TOP_LEFT, 8, kOnxLandscapeLayout ? 23 : 32);
     lv_obj_set_size(onx_metric_detail_label_, kOnxLandscapeLayout ? 104 : 123,
-                    kOnxLandscapeLayout ? 18 : 24);
+                    kOnxLandscapeLayout ? 20 : 24);
     lv_label_set_long_mode(onx_metric_detail_label_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(onx_metric_detail_label_, dosis20, 0);
     lv_obj_set_style_text_color(onx_metric_detail_label_, lv_color_hex(kOnxColorSoft), 0);
@@ -4235,10 +4248,12 @@ esp_err_t Ui::build_dashboard() {
   if (kOnxUiLayout) {
     page3_info_hint_ = lv_label_create(page3_info_panel_);
     set_label_text_if_changed(page3_info_hint_,
-                              kOnxLandscapeLayout ? "Tap image to refresh" :
+                              kOnxLandscapeLayout ? "Tap image" :
                               "Auto-refresh while open");
     lv_obj_set_pos(page3_info_hint_, kOnxLandscapeLayout ? 12 : 0,
-                   kOnxLandscapeLayout ? 178 : 42);
+                   kOnxLandscapeLayout ? 198 : 42);
+    lv_obj_set_size(page3_info_hint_, kOnxLandscapeLayout ? 120 : 296,
+                    kOnxLandscapeLayout ? 20 : LV_SIZE_CONTENT);
     lv_obj_set_width(page3_info_hint_, kOnxLandscapeLayout ? 120 : 296);
     lv_label_set_long_mode(page3_info_hint_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(page3_info_hint_,
@@ -4247,15 +4262,34 @@ esp_err_t Ui::build_dashboard() {
                                 lv_color_hex(kOnxLandscapeLayout ? kOnxColorCyan :
                                              kOnxColorMuted), 0);
 
+    page3_refresh_label_ = lv_label_create(page3_info_panel_);
+    set_label_text_if_changed(page3_refresh_label_,
+                              kOnxLandscapeLayout ? "Auto 2s" :
+                              "Auto-refresh while open");
+    lv_obj_set_pos(page3_refresh_label_, kOnxLandscapeLayout ? 12 : 0,
+                   kOnxLandscapeLayout ? 156 : 42);
+    lv_obj_set_size(page3_refresh_label_, kOnxLandscapeLayout ? 120 : 296,
+                    kOnxLandscapeLayout ? 20 : LV_SIZE_CONTENT);
+    lv_label_set_long_mode(page3_refresh_label_, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_font(page3_refresh_label_,
+                               kOnxLandscapeLayout ? &lv_font_montserrat_14 : info20, 0);
+    lv_obj_set_style_text_color(page3_refresh_label_, lv_color_hex(kOnxColorMuted), 0);
+    if (!kOnxLandscapeLayout) {
+      lv_obj_add_flag(page3_refresh_label_, LV_OBJ_FLAG_HIDDEN);
+    }
+    enable_touch_bubble(page3_refresh_label_);
+
     page3_source_label_ = lv_label_create(page3_info_panel_);
     set_label_text_if_changed(page3_source_label_,
-                              kOnxLandscapeLayout ? "Source: waiting\nAuto-refresh while open" :
+                              kOnxLandscapeLayout ? "Source: waiting" :
                               "Source: local JPEG snapshot");
     lv_obj_set_pos(page3_source_label_, kOnxLandscapeLayout ? 12 : 0,
-                   kOnxLandscapeLayout ? 130 : 78);
+                   kOnxLandscapeLayout ? 124 : 78);
+    lv_obj_set_size(page3_source_label_, kOnxLandscapeLayout ? 120 : 296,
+                    kOnxLandscapeLayout ? 20 : LV_SIZE_CONTENT);
     lv_obj_set_width(page3_source_label_, kOnxLandscapeLayout ? 120 : 296);
     lv_label_set_long_mode(page3_source_label_,
-                           kOnxLandscapeLayout ? LV_LABEL_LONG_WRAP : LV_LABEL_LONG_DOT);
+                           LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(page3_source_label_,
                                kOnxLandscapeLayout ? &lv_font_montserrat_14 : info20, 0);
     lv_obj_set_style_text_color(page3_source_label_, lv_color_hex(kOnxColorMuted), 0);
@@ -4306,10 +4340,10 @@ void Ui::apply_page_visibility() {
   set_hidden(layer_label_, !on_page1);
   set_hidden(nozzle_prefix_label_, !on_page1);
   set_hidden(nozzle_value_label_, !on_page1);
-  set_hidden(nozzle_aux_label_, !on_page1 || !nozzle_aux_visible_);
+  set_hidden(nozzle_aux_label_, !on_page1 || !nozzle_aux_visible_ || kOnxLandscapeLayout);
   set_hidden(bed_prefix_label_, !on_page1);
   set_hidden(bed_value_label_, !on_page1);
-  set_hidden(bed_aux_label_, !on_page1 || !bed_aux_visible_);
+  set_hidden(bed_aux_label_, !on_page1 || !bed_aux_visible_ || kOnxLandscapeLayout);
   set_hidden(remaining_row_, !on_page1);
   set_hidden(badge_slot_, !on_page1);
   set_hidden(portal_hint_label_, !show_portal_hint);
