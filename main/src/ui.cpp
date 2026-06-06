@@ -28,6 +28,7 @@ extern const lv_font_t dosis_40;
 extern const lv_font_t lv_font_montserrat_20;
 extern const lv_font_t mdi_30;
 extern const lv_font_t mdi_40;
+extern const lv_font_t onx_cjk_16;
 }
 
 namespace printsphere {
@@ -1126,65 +1127,19 @@ std::string eta_text(const PrinterSnapshot& snapshot) {
   return buffer;
 }
 
-bool is_visible_ascii(unsigned char c) {
-  return c >= 0x21U && c <= 0x7EU;
+std::string display_text_for_label(const std::string& raw, const char* /*semantic_fallback*/) {
+  return raw;
 }
 
-std::string trim_ascii_fragment(std::string text) {
-  while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front()))) {
-    text.erase(text.begin());
-  }
-  while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back()))) {
-    text.pop_back();
-  }
-  return text;
+const lv_font_t* dynamic_text_font() {
+  return kOnxLandscapeLayout ? &onx_cjk_16 : nullptr;
 }
 
-std::string display_text_for_label(const std::string& raw, const char* semantic_fallback) {
-  bool has_non_ascii = false;
-  for (unsigned char c : raw) {
-    if (c >= 0x80U) {
-      has_non_ascii = true;
-      break;
-    }
+void set_dynamic_text_font(lv_obj_t* label) {
+  const lv_font_t* font = dynamic_text_font();
+  if (label != nullptr && font != nullptr) {
+    lv_obj_set_style_text_font(label, font, 0);
   }
-  if (!has_non_ascii) {
-    return raw;
-  }
-
-  std::string ascii;
-  ascii.reserve(raw.size());
-  size_t visible_count = 0;
-  bool last_space = true;
-  for (unsigned char c : raw) {
-    if (c >= 0x20U && c <= 0x7EU) {
-      if (c == ' ') {
-        if (!last_space) {
-          ascii.push_back(' ');
-        }
-        last_space = true;
-      } else {
-        ascii.push_back(static_cast<char>(c));
-        last_space = false;
-      }
-      if (is_visible_ascii(c)) {
-        ++visible_count;
-      }
-    } else if (!last_space) {
-      ascii.push_back(' ');
-      last_space = true;
-    }
-  }
-  ascii = trim_ascii_fragment(ascii);
-  if (visible_count < 3 || ascii.empty()) {
-    return std::string(semantic_fallback) + " [UTF8]";
-  }
-  if (ascii.size() > 24U) {
-    const std::string prefix = trim_ascii_fragment(ascii.substr(0, 14));
-    const std::string suffix = trim_ascii_fragment(ascii.substr(ascii.size() - 8));
-    return prefix + "..." + suffix + " [UTF8]";
-  }
-  return ascii + " [UTF8]";
 }
 
 bool looks_like_serial(const std::string& text) {
@@ -1897,6 +1852,9 @@ void Ui::rebuild_printer_cards_locked(const std::vector<PrinterCardInfo>& cards)
     lv_obj_set_width(name_lbl, kOnxLandscapeLayout ? 208 : (kOnxUiLayout ? 250 : 300));
     lv_label_set_long_mode(name_lbl, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(name_lbl, font_name, 0);
+    if (kOnxLandscapeLayout) {
+      set_dynamic_text_font(name_lbl);
+    }
     lv_obj_set_style_text_color(name_lbl,
                                 lv_color_hex(kOnxUiLayout ? kOnxColorText : 0xFFFFFF), 0);
     if (kOnxLandscapeLayout) {
@@ -3764,6 +3722,7 @@ esp_err_t Ui::build_dashboard() {
     lv_obj_set_size(page0_detail_title_, 120, 40);
     lv_label_set_long_mode(page0_detail_title_, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_font(page0_detail_title_, dosis20, 0);
+    set_dynamic_text_font(page0_detail_title_);
     lv_obj_set_style_text_color(page0_detail_title_, lv_color_hex(kOnxColorText), 0);
 
     page0_detail_state_ = lv_label_create(page0_detail_panel_);
@@ -4058,6 +4017,7 @@ esp_err_t Ui::build_dashboard() {
                     kOnxLandscapeLayout ? 38 : 42);
     lv_label_set_long_mode(onx_job_label_, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_font(onx_job_label_, dosis20, 0);
+    set_dynamic_text_font(onx_job_label_);
     lv_obj_set_style_text_color(onx_job_label_, lv_color_hex(kOnxColorText), 0);
 
     if (kOnxLandscapeLayout) {
@@ -4075,6 +4035,7 @@ esp_err_t Ui::build_dashboard() {
       lv_label_set_long_mode(detail_label_, LV_LABEL_LONG_WRAP);
       lv_obj_set_style_text_align(detail_label_, LV_TEXT_ALIGN_LEFT, 0);
       lv_obj_set_style_text_font(detail_label_, &lv_font_montserrat_14, 0);
+      set_dynamic_text_font(detail_label_);
       lv_obj_set_style_text_color(detail_label_, lv_color_hex(kOnxColorSoft), 0);
       lv_obj_set_style_bg_color(detail_label_, lv_color_hex(kOnxColorPanel), 0);
       lv_obj_set_style_bg_opa(detail_label_, LV_OPA_COVER, 0);
@@ -4205,6 +4166,7 @@ esp_err_t Ui::build_dashboard() {
                     kOnxLandscapeLayout ? 20 : 24);
     lv_label_set_long_mode(onx_metric_detail_label_, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_font(onx_metric_detail_label_, dosis20, 0);
+    set_dynamic_text_font(onx_metric_detail_label_);
     lv_obj_set_style_text_color(onx_metric_detail_label_, lv_color_hex(kOnxColorSoft), 0);
 
     lv_obj_set_size(remaining_row_, kOnxLandscapeLayout ? 172 : 296,
@@ -4348,6 +4310,7 @@ esp_err_t Ui::build_dashboard() {
   lv_obj_set_style_text_align(page2_subnote_,
                               kOnxUiLayout ? LV_TEXT_ALIGN_LEFT : LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_style_text_font(page2_subnote_, info20, 0);
+  set_dynamic_text_font(page2_subnote_);
   lv_obj_set_style_text_color(page2_subnote_,
                               lv_color_hex(kOnxUiLayout ? kOnxColorText : 0x888888), 0);
   if (kOnxUiLayout) {
@@ -4372,6 +4335,7 @@ esp_err_t Ui::build_dashboard() {
                            kOnxLandscapeLayout ? LV_LABEL_LONG_WRAP : LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_align(page2_detail_label_, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_style_text_font(page2_detail_label_, &lv_font_montserrat_14, 0);
+    set_dynamic_text_font(page2_detail_label_);
     lv_obj_set_style_text_color(page2_detail_label_, lv_color_hex(kOnxColorMuted), 0);
     lv_obj_add_flag(page2_detail_label_, LV_OBJ_FLAG_HIDDEN);
     enable_touch_bubble(page2_detail_label_);

@@ -38,6 +38,7 @@ idf_component_register(
         "include/font/dosis_20.c"
         "include/font/dosis_32.c"
         "include/font/dosis_40.c"
+        "include/font/onx_cjk_16.c"
         "include/img/bambuicon.c"
         "include/font/mdi_30.c"
         "include/font/mdi_40.c"
