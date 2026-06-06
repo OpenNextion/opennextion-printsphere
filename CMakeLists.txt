@@ -4,8 +4,9 @@ set(IDF_TARGET "esp32s3")
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(PRINTSPHERE_RELEASE_VERSION "v1.6-beta1")
+set(PRINTSPHERE_RELEASE_VERSION "v1.6-beta1" CACHE STRING "PrintSphere release version")
 set(PROJECT_VER "${PRINTSPHERE_RELEASE_VERSION}")
+message(STATUS "PrintSphere release version: ${PRINTSPHERE_RELEASE_VERSION}")
 
 set(PRINTSPHERE_BOARD "waveshare_amoled_1_75" CACHE STRING "PrintSphere board profile")
 set_property(CACHE PRINTSPHERE_BOARD PROPERTY STRINGS
@@ -74,7 +75,7 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 set(RELEASE_INITIAL_FLASH_DIR "${CMAKE_SOURCE_DIR}/release")
 set(RELEASE_INITIAL_FLASH_IMAGE "${RELEASE_INITIAL_FLASH_DIR}/firmware.bin")
 set(RELEASE_INITIAL_FLASH_VERSIONED_IMAGE
-    "${RELEASE_INITIAL_FLASH_DIR}/firmware-${PRINTSPHERE_RELEASE_VERSION}.bin")
+    "${RELEASE_INITIAL_FLASH_DIR}/archive/firmware-${PRINTSPHERE_RELEASE_VERSION}.bin")
 set(RELEASE_INITIAL_FLASH_PACKAGER "${CMAKE_SOURCE_DIR}/tools/package_initial_flash.py")
 # Error lookup TSV is embedded directly into the app binary via EMBED_TXTFILES
 # in main/CMakeLists.txt — no SPIFFS partition needed.
