@@ -8,26 +8,17 @@ set(PRINTSPHERE_RELEASE_VERSION "v1.6-beta1" CACHE STRING "PrintSphere release v
 set(PROJECT_VER "${PRINTSPHERE_RELEASE_VERSION}")
 message(STATUS "PrintSphere release version: ${PRINTSPHERE_RELEASE_VERSION}")
 
-set(PRINTSPHERE_BOARD "waveshare_amoled_1_75" CACHE STRING "PrintSphere board profile")
+set(PRINTSPHERE_BOARD "onx3248g035" CACHE STRING "PrintSphere board profile")
 set_property(CACHE PRINTSPHERE_BOARD PROPERTY STRINGS
-    waveshare_amoled_1_75
     onx3248g035
 )
-set(PRINTSPHERE_ONX_ORIENTATION "portrait" CACHE STRING "ONX3248G035 display orientation")
+set(PRINTSPHERE_ONX_ORIENTATION "landscape" CACHE STRING "ONX3248G035 display orientation")
 set_property(CACHE PRINTSPHERE_ONX_ORIENTATION PROPERTY STRINGS
-    portrait
     landscape
 )
 
-if(PRINTSPHERE_BOARD STREQUAL "waveshare_amoled_1_75")
-    set(COMPONENTS
-        main
-        XPowersLib
-        esp32_s3_touch_amoled_1_75
-    )
-elseif(PRINTSPHERE_BOARD STREQUAL "onx3248g035")
-    if(NOT PRINTSPHERE_ONX_ORIENTATION STREQUAL "portrait" AND
-       NOT PRINTSPHERE_ONX_ORIENTATION STREQUAL "landscape")
+if(PRINTSPHERE_BOARD STREQUAL "onx3248g035")
+    if(NOT PRINTSPHERE_ONX_ORIENTATION STREQUAL "landscape")
         message(FATAL_ERROR "Unsupported PRINTSPHERE_ONX_ORIENTATION=${PRINTSPHERE_ONX_ORIENTATION}")
     endif()
     set(COMPONENTS

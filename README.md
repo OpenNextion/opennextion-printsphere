@@ -1,195 +1,121 @@
-# PrintSphere
+# OpenNextion-printsphere
 
-Round ESP32-S3 printer companion for Bambu Lab with a circular display, touch setup, hybrid cloud/local routing, and the current code paths for cover preview, camera snapshots, and battery-aware operation.
+[![English](https://img.shields.io/badge/lang-English-blue)](./README.md)
+[![中文](https://img.shields.io/badge/lang-中文-red)](./README.zh-CN.md)
 
-<img width="400" height="300" alt="image" src="https://github.com/user-attachments/assets/820c2e9b-10a7-4430-949c-e8b0adc1357d" /><img width="400" height="300" alt="image" src="https://github.com/user-attachments/assets/5923dc59-0123-4df1-b54d-673c6dbad23b" />
+OpenNextion-printsphere is a desktop status display project that ports [PrintSphere](https://github.com/cptkirki/PrintSphere) to OpenNextion ESP32 rectangular displays. It is designed to show Bambu Lab printer status, file information, AMS information, cover images, and camera snapshots.
 
-## MakerWorld
+The first adapted and tested display model is [ONX3248G035][onx3248g035].
 
-- MakerWorld model: `https://makerworld.com/de/models/2517189-printsphere-bambu-status-display-standalone-1-75`
+## Background
 
-## Hardware And Stack
+I wanted to build a small desktop display for my Bambu Lab printer, so I could check the current print status directly from my desk. There is already an excellent project on GitHub called [PrintSphere](https://github.com/cptkirki/PrintSphere), but the original project is mainly designed for a round display.
 
-- ESP-IDF `v5.5.x`
-- LVGL `v9.4.0`
-- Waveshare ESP32-S3 AMOLED 1.75
-- AXP2101 PMU integration via `XPowersLib`
-- no Home Assistant required
+I do not have that round display, but I do have several rectangular OpenNextion ESP32 displays, so I decided to port PrintSphere to these rectangular screens. The first completed target is [ONX3248G035][onx3248g035], which can be placed horizontally on a desk and used to show printer status, AMS information, cover images, and camera snapshots.
 
-## Current Codebase Features
+I chose OpenNextion displays for two reasons. First, they use ESP32 as the main controller and provide rich peripheral interfaces, which makes them useful for future DIY projects. Second, OpenNextion provides relatively complete open source and hardware resources, which makes both software porting and enclosure design easier.
 
-- official Waveshare BSP for display, touch, and LVGL
-- NVS-based configuration storage
-- `AP+STA` Wi-Fi manager
-- local setup portal on `esp_http_server`
-- Web Config that stays open during initial provisioning and switches to PIN/session unlock on the home network afterwards
-- Bambu Cloud login flow with email/password plus email-code or 2FA handling
-- hybrid routing logic between Bambu Cloud and the local printer path
-- cloud MQTT as the primary live cloud status path plus metadata / cover preview handling
-- local MQTT status path with live reconnect logic from the web portal
-- embedded Bambu CA bundle for local MQTT TLS verification
-- merged status, metrics, temperatures, errors, and HMS data depending on model and source availability
-- cloud cover image/title page in the UI where available
-- local camera snapshot page with tap refresh and periodic refresh while open
-- arc color tuning from Web Config with live preview behavior
-- hardware display rotation with touch alignment and a Web Config restart action
-- chamber light toggle path on supported models
-- battery and USB status with power-aware behavior
-- embedded on-device error text lookup database without a separate storage partition
-- V2 protocol support for P2S and H2 series (`snow`-based spool detection, `vir_slot` filament info)
-- AMS page with individual tray pills and EXT spool indicator
-- OTA firmware update support
+For example, the [ONX3248G035][onx3248g035] resources include sample code, schematics, board-level materials, and 2D DWG plus 3D STP files. For this printer display project, no extra hardware is needed for the current version. A simple horizontal desktop stand is enough. Based on the official 3D files, I was able to quickly create a simple stand for using [ONX3248G035][onx3248g035] on my desk.
 
-## Flashing
+## Current Porting Work
 
-for the first use please use the Webflasher: https://cptkirki.github.io/PrintSphere/flash/
-For OTA updates, use [`release/ota/printsphere_ota.bin`](release/ota/printsphere_ota.bin).
+This version is based on PrintSphere and adds OpenNextion support. The main changes are:
 
-### manual flashing:
+### 1. Added [ONX3248G035][onx3248g035] Board Support
 
-[`release/initial/printsphere_full.bin`](release/initial/printsphere_full.bin) is the merged initial-flash image for empty devices.
+This port adds a BSP for [ONX3248G035][onx3248g035], keeping display, touch, backlight, and LVGL initialization inside a dedicated board-level component. The public `v0.1.0` source build target is [ONX3248G035][onx3248g035] in landscape orientation.
 
-Versioned builds are archived in the `archive/` subfolder of each release directory.
+The landscape UI has completed the main adaptation work and has been tested on real hardware. Other display models or orientations are not public `v0.1.0` build targets.
 
-### PrintSphere Web Installer
+### 2. Reworked the Rectangular Landscape UI
 
-`https://cptkirki.github.io/PrintSphere/flash/`
+The original project is mainly designed for a round screen. This port reorganizes the landscape UI for the rectangular [ONX3248G035][onx3248g035] display, making the main status page, AMS information, cover page, and camera page more suitable for horizontal desktop viewing.
 
-- stable is selected by default
-- newer beta factory images are available from the firmware selector
-- Chrome or Edge with Web Serial support is required
+The landscape version focuses on information density, text areas, status layout, and AMS tray display, avoiding wasted space and content overflow that can happen when a round-screen UI is directly moved to a rectangular display.
 
-### Web Flashers
+### 3. Improved CN Region Bambu Cloud Certificate Compatibility
 
-`web.esphome.io`
-`https://web.esphome.io/`
+For CN region accounts and cloud resources, this port adds handling for CN region endpoints such as `api.bambulab.cn`, `bambulab.cn`, and `cn.mqtt.bambulab.com`. It also uses the matching `GlobalSign Root R3` CA certificate for CN region cloud HTTP requests, preview downloads, and related TLS connections.
 
-- connect USB
-- choose the COM port
-- do not use "Prepare for first use"
-- install `printsphere_full.bin` directly
+This change is intended to improve compatibility with Bambu Cloud login, device list retrieval, cover image downloads, and cloud resource access in the CN region when certificate chain issues are encountered. Non-CN paths continue to use the default ESP-IDF certificate bundle.
 
-`espboards.dev`
-`https://www.espboards.dev/tools/program/`
+### 4. Added a CJK Font Subset
 
-- write `printsphere_full.bin` to address `0x0`
+This port adds the `onx_cjk_16` LVGL font, generated from Source Han Sans SC. It includes ASCII plus about 2,500 commonly used modern Chinese characters. This font improves rendering for Chinese file names, Chinese project names, and device-side prompt text.
 
-`esptool-js`
-`https://espressif.github.io/esptool-js/`
+## Current Validation Status
 
-- write `printsphere_full.bin` to address `0x0`
+### Display Validation
 
-The bootloader is already included in the merged image.
+- [ONX3248G035][onx3248g035] can run OpenNextion-printsphere
+- [ONX3248G035][onx3248g035] landscape mode has completed the main real-device validation
+- The landscape UI can show the main printer status correctly
+- Chinese file name display has been improved with the CJK font subset
+- Other display models or orientations are not included as public `v0.1.0` build targets
+- OTA firmware update has not yet been validated on real hardware, so the first release should use full firmware flashing first
 
-### Local Build / Flash
+### Printers I Have and Validation Matrix
 
-If you clone the repo and build it yourself:
+Legend: ✅ Verified / ⚠️ Partially verified or not covered by my test setup / ❌ Failed or unavailable / ⏳ Not tested
 
-```bash
-idf.py -p PORT flash
-```
+| Printer | Connection mode | Connection / binding | Status data | AMS data | Cover image | Camera | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Bambu Lab A1 mini | Local mode | ✅ Verified | ✅ Verified | ⚠️ Not covered by setup | ❌ Unavailable | ✅ Verified | My current A1 mini test setup does not include AMS; cover page is currently unavailable in local mode |
+| Bambu Lab A1 mini | Hybrid mode | ⏳ Not tested | ⏳ Not tested | ⏳ Not tested | ⏳ Not tested | ⏳ Not tested | Needs separate validation |
+| Bambu Lab H2C | Local mode | ⏳ Not tested | ⏳ Not tested | ⏳ Not tested | ⏳ Not tested | ⏳ Not tested | Needs separate validation |
+| Bambu Lab H2C | Hybrid / cloud mode | ✅ Verified | ✅ Verified | ✅ Verified | ✅ Verified | ❌ Unavailable | Only tested with a CN region account |
+| Bambu Lab P1S | Local mode | ⏳ Not tested | ⏳ Not tested | ⏳ Not tested | ⏳ Not tested | ⏳ Not tested | Needs validation for login, connection, status display, and camera behavior |
+| Bambu Lab P1S | Hybrid mode | ⏳ Not tested | ⏳ Not tested | ⏳ Not tested | ⏳ Not tested | ⏳ Not tested | Needs validation for login, connection, status display, and camera behavior |
 
-Alternatively, write the merged image directly with `esptool`:
+## Supported Hardware
 
-```bash
-esptool.exe --chip esp32s3 --port PORT write_flash 0x0 release/initial/printsphere_full.bin
-```
+| Model | Size | Status | Notes |
+| --- | --- | --- | --- |
+| [ONX3248G035][onx3248g035] | 3.5 inch | Verified | First adapted model, landscape mode recommended |
+| [ONX2432G028][onx2432g028] | 2.8 inch | Planned | Planned future target, smaller and lower cost |
 
-## Setup Flow
+## Firmware Download and Flashing
 
-1. Flash [`printsphere_full.bin`](https://github.com/cptkirki/PrintSphere/blob/main/release/initial/printsphere_full.bin)
-2. On first boot, the device starts a setup AP:
-   - SSID: `PrintSphere-Setup`
-   - password: `printsphere`
-3. Open `http://192.168.4.1` and save your home Wi-Fi.
-4. After the reboot, reopen Web Config on the device IP in your home network.
-5. During provisioning, Web Config stays open without a PIN until the selected source path is ready.
-6. Choose the connection mode you want to run:
-   - `Cloud only`
-   - `Local only`
-   - `Hybrid`
-7. Complete only the source path that your chosen mode requires:
-   - `Cloud only`: connect Bambu Cloud
-   - `Local only`: connect the local printer path
-   - `Hybrid`: connect either path first; the portal unlocks setup once one path is working, and you can add the other later
-8. Bambu Cloud login supports:
-   - email + password
-   - optional email code
-   - optional 2FA code
-9. The local printer path uses:
-   - printer IP or hostname
-   - printer serial number
-   - access code
-10. After provisioning is complete, Web Config on the home network uses the on-device PIN/session unlock flow.
-   - hold anywhere on the display for about one second to request a six-digit PIN
-   - PIN lifetime: about 2 minutes
-   - unlocked browser session: about 10 minutes
+The first release is planned as `v0.1.0`. After the release is published, the GitHub Releases page will provide one full initial flashing image for the released display model and orientation.
 
-Cloud and local credentials can usually be applied live from Web Config without another reboot. Changing the connection mode itself or applying a new screen rotation still restarts the device.
+| Display model | Orientation | Firmware file | Version | Status |
+| --- | --- | --- | --- | --- |
+| [ONX3248G035][onx3248g035] | Landscape | `opennextion-printsphere-onx3248g035-landscape-full-v0.1.0.bin` | `v0.1.0` | Ready for GitHub Release upload |
 
-## Connection Modes
+For the first release, full firmware flashing is recommended. OTA update flow has not yet been validated on real hardware, so OTA firmware downloads are not provided for the first release.
 
-- `Hybrid`:
-  Current default recommendation. PrintSphere tries to combine cloud and local data, picks the better active path at runtime, and still uses the local camera when available. Provisioning is considered complete once Wi-Fi is connected and either Cloud or Local is working.
-- `Cloud only`:
-  Cloud monitoring and cover preview only. Local MQTT and the local camera page are disabled. Provisioning is complete once Wi-Fi and Bambu Cloud are connected.
-- `Local only`:
-  Local MQTT monitoring and the local camera path without requiring Bambu Cloud. Provisioning is complete once Wi-Fi and the local printer path are connected. The cloud cover page is not used in this mode.
+Portrait firmware for [ONX3248G035][onx3248g035] and firmware for [ONX2432G028][onx2432g028] would require separate public build profiles and release validation, so they are not `v0.1.0` release assets.
 
-## Model Notes
+## Roadmap
 
-- Cloud can now also carry progress, remaining time, layers, and temperatures on many models.
-- In `Hybrid`, the current code prefers cloud status for `P2S` and the `H2` family.
-- The current code has local status paths for:
-  `A1`, `A1 Mini`, `P1P`, `P1S`, `X1`, `X1C`, `X1E`
-- `P2S` local status works via V2 protocol fields (`snow`, `vir_slot`); some V1 fields may be absent or stale.
-- The `H2` family requires Developer Mode for local status.
-- Camera snapshots are only available on `A1`, `A1 Mini`, `P1P`, and `P1S`.
-  These models expose a local JPEG snapshot endpoint that the ESP32-S3 can handle.
-  Newer models (`P2S`, `H2`, `X1` series) use RTSP video streams only — the ESP32-S3 hardware lacks the memory and processing power to decode these streams. This is a hardware limitation that cannot be worked around with software changes alone.
-- The code currently exposes chamber light control on supported `P1S`, `P2`, `H2`, and `X1` models.
+Planned next steps:
 
-## UI Overview
+- Plan future landscape and portrait support for [ONX2432G028][onx2432g028]
+- Investigate the unavailable camera page on Bambu Lab H2C in hybrid / cloud mode
+- Validate Bambu Lab A1 mini in hybrid mode, including connection, status, AMS, cover image, and camera behavior
+- Validate Bambu Lab H2C in local mode, including connection, status, AMS, cover image, and camera behavior
+- Validate Bambu Lab P1S in local mode and hybrid mode, including login, connection, status display, AMS, cover image, and camera behavior
 
-- Page 1:
-  can show progress ring, lifecycle state, job name, temperatures, layers, remaining time, Wi-Fi, battery, and USB state
-- Page 2:
-  can show cloud cover preview and title
-- Page 3:
-  can show local camera snapshots when that path is working
-- Long-press on the display:
-  requests a Web Config PIN
-- Tap on the camera page:
-  requests a refresh of the current image
-- Tap the center logo on page 1 on supported printers:
-  requests a chamber light toggle
-- Dynamic secondary text such as IP addresses, project titles, and portal hints uses a more complete font for better glyph coverage
+## Credits
 
-## Web Config
+This project is based on PrintSphere. Thanks to the original author and the related open source projects.
 
-Web Config currently exposes sections for:
+- PrintSphere: https://github.com/cptkirki/PrintSphere
+- OpenNextion open source projects: https://github.com/OpenNextion
 
-- `Step 1 - Wi-Fi`
-- `Connection Mode`
-- `Step 2 - Bambu Cloud`
-- `Step 3 - Local Printer Path`
-- `Screen Rotation`
-- `Arc Colors`
+## License
 
-During initial provisioning, Web Config stays open until the selected source mode has at least one working path. After that, the portal uses the on-device PIN/session unlock flow on the home network.
+OpenNextion-printsphere is a non-commercial derivative of [PrintSphere](https://github.com/cptkirki/PrintSphere). It preserves the original project's copyright and root license terms.
 
-Arc colors are intended to preview live immediately and can be saved without restarting the device. Screen rotation uses the display controller's hardware rotation and applies on restart so touch stays aligned.
+This project as a whole is licensed under the `Federation Non-Commercial License (FNCL) v1.1`. You may use, copy, modify, and share it for non-commercial purposes. Any commercial use requires separate written commercial permission from the original copyright holder.
 
-<img width="1078" height="686" alt="image" src="https://github.com/user-attachments/assets/9b80b93e-5963-46da-a284-471fd7be27f0" />
+Firmware files published in GitHub Releases are also subject to the FNCL v1.1 non-commercial restriction. Third-party components or fonts may have their own license notices; see `NOTICE.md`.
 
-## Current Limitations
+## Disclaimer
 
-- **Camera snapshots are limited to `A1`, `A1 Mini`, `P1P`, `P1S` due to ESP32-S3 hardware constraints.** Newer models only offer RTSP streams which the ESP32-S3 cannot decode.
-- cloud/local behavior on newer families still needs broader real-world validation
-- `P2S` local status uses V2 protocol; some legacy fields may behave differently than on older printers
-- `H2` local status requires Developer Mode
-- local MQTT TLS now uses an embedded Bambu CA bundle
-- `Local only` works, but the broadest hands-on validation so far is still in `Hybrid` and `Cloud only`
-- most hands-on testing so far has been on `P1S` and `P1P`
+This project is not an official Bambu Lab project, not an official OpenNextion project, and not the official original PrintSphere project.
 
+Flashing and using third-party firmware involves risk. Please use it only after understanding the risks. This project is not responsible for device damage, data loss, interrupted prints, network connection issues, or any other consequences of use.
 
+[onx3248g035]: https://nextion.tech/wiki/onx3248g035/
+[onx2432g028]: https://nextion.tech/wiki/onx2432g028/

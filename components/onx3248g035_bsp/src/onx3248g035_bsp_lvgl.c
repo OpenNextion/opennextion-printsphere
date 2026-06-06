@@ -1,7 +1,7 @@
 #include <inttypes.h>
 #include <stdint.h>
 
-#include "bsp/esp32_s3_touch_amoled_1_75.h"
+#include "bsp/onx3248g035_compat.h"
 #include "esp_check.h"
 #include "esp_heap_caps.h"
 #include "esp_lcd_panel_ops.h"

@@ -8,7 +8,7 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "bsp/esp32_s3_touch_amoled_1_75.h"
+#include "bsp/onx3248g035_compat.h"
 #include "printsphere/error_lookup.hpp"
 #include "printsphere/status_resolver.hpp"
 #include "printsphere/time_sync.hpp"

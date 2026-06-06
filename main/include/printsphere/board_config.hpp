@@ -11,16 +11,10 @@ constexpr int kDisplayHeight = 320;
 constexpr bool kDisplayLandscape = true;
 constexpr char kDisplayOrientation[] = "landscape";
 #else
-constexpr int kDisplayWidth = 320;
-constexpr int kDisplayHeight = 480;
-constexpr bool kDisplayLandscape = false;
-constexpr char kDisplayOrientation[] = "portrait";
+#error "Unsupported ONX3248G035 orientation for the public build"
 #endif
-#elif defined(PRINTSPHERE_BOARD_WAVESHARE_AMOLED_1_75) && PRINTSPHERE_BOARD_WAVESHARE_AMOLED_1_75
-constexpr int kDisplayWidth = 466;
-constexpr int kDisplayHeight = 466;
-constexpr bool kDisplayLandscape = false;
-constexpr char kDisplayOrientation[] = "square";
+#else
+#error "Unsupported PrintSphere board profile for the public build"
 #endif
 
 constexpr gpio_num_t kI2cScl = GPIO_NUM_14;
@@ -36,6 +30,6 @@ constexpr gpio_num_t kQspiData2 = GPIO_NUM_6;
 constexpr gpio_num_t kQspiData3 = GPIO_NUM_7;
 
 constexpr int kAxp2101Address = 0x34;
-constexpr char kBoardName[] = "Waveshare ESP32-S3 AMOLED 1.75";
+constexpr char kBoardName[] = "ONX3248G035";
 
 }  // namespace printsphere::board

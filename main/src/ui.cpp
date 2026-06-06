@@ -10,7 +10,7 @@
 #include <string>
 
 #include "misc/cache/instance/lv_image_cache.h"
-#include "bsp/esp32_s3_touch_amoled_1_75.h"
+#include "bsp/onx3248g035_compat.h"
 #include "esp_check.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
@@ -1678,9 +1678,10 @@ void Ui::apply_page0_parallax(bool force) {
   lv_obj_set_style_translate_y(page0_card_list_, cards_y, 0);
   // NOTE: lv_obj_set_style_opa() on large containers forces LVGL to render the entire
   // widget tree into a temporary offscreen layer before blending it at the given opacity.
-  // With LV_DRAW_LAYER_SIMPLE_BUF_SIZE=24KB on a 466px-wide display that means ~14 layer
-  // passes for the card list alone — triggered every LV_EVENT_SCROLL. This reduces scroll
-  // fps to ~4. Use only translate_y for the parallax shift; no opa on large containers.
+  // With LV_DRAW_LAYER_SIMPLE_BUF_SIZE=24KB on a full-width display that means repeated
+  // layer passes for the card list alone, triggered every LV_EVENT_SCROLL. This reduces
+  // scroll fps sharply. Use only translate_y for the parallax shift; no opa on large
+  // containers.
   if (page0_empty_note_ != nullptr) {
     // empty_note is a single small label — opa is cheap here
     lv_obj_set_style_opa(page0_empty_note_, page0_opa, 0);
@@ -1689,9 +1690,9 @@ void Ui::apply_page0_parallax(bool force) {
   // Overlay (arc, progress, battery): fade in as we leave page 0
   const lv_opa_t overlay_opa = static_cast<lv_opa_t>(255 * clamped / page_w);
 
-  // fixed_overlay_ contains the full-screen arc (466×466 px).  Setting opa to any
-  // fractional value forces LVGL to render the entire widget tree into a 24 KB
-  // offscreen-layer buffer → ~18 layer-passes per scroll event → measurable stutter.
+  // fixed_overlay_ contains full-screen overlay widgets. Setting opa to any fractional
+  // value forces LVGL to render the entire widget tree into a 24 KB offscreen-layer buffer,
+  // adding repeated layer passes per scroll event and measurable stutter.
   // Instead we snap to binary visibility: hidden while page 0 dominates, fully
   // opaque once we cross the midpoint toward page 1.  Exactly 0 and LV_OPA_COVER
   // are both "fully decided" → LVGL skips the layer path entirely.
