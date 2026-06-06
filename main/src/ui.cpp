@@ -1156,14 +1156,6 @@ bool is_remaining_duration_value(const std::string& value) {
   return has_digit && has_duration_unit;
 }
 
-bool is_wall_clock_eta_value(const std::string& value) {
-  return value.size() == 5 && value[2] == ':' && value != "--:--" &&
-         value[0] >= '0' && value[0] <= '9' &&
-         value[1] >= '0' && value[1] <= '9' &&
-         value[3] >= '0' && value[3] <= '9' &&
-         value[4] >= '0' && value[4] <= '9';
-}
-
 std::string display_text_for_label(const std::string& raw, const char* /*semantic_fallback*/) {
   return raw;
 }
@@ -2327,19 +2319,17 @@ void Ui::apply_snapshot_locked(const PrinterSnapshot& snapshot, bool force_ring_
                                   : metric_detail);
   }
 
-  const std::string remaining = show_eta_ ? eta_text(snapshot) : remaining_text(snapshot);
-  // Hide the clock-icon prefix in ETA mode — leaves more room for "HH:MM"
-  // and avoids the redundant clock-glyph + clock-time stutter. Landscape only
-  // shows the ASCII "Rem" prefix when the value is still a duration.
+  const bool use_eta = !kOnxLandscapeLayout && show_eta_;
+  const std::string remaining = use_eta ? eta_text(snapshot) : remaining_text(snapshot);
+  // Landscape debug builds avoid wall-clock ETA because local time/SNTP can be
+  // misleading on device; only the remaining duration gets the "Rem" prefix.
   const bool show_remaining_prefix = kOnxLandscapeLayout
-      ? (!show_eta_ && is_remaining_duration_value(remaining))
-      : !show_eta_;
+      ? is_remaining_duration_value(remaining)
+      : !use_eta;
   if (kOnxLandscapeLayout) {
     std::string remaining_display = remaining;
-    if (!show_eta_ && is_remaining_duration_value(remaining)) {
+    if (is_remaining_duration_value(remaining)) {
       remaining_display = "Rem " + remaining;
-    } else if (show_eta_ && is_wall_clock_eta_value(remaining)) {
-      remaining_display = "ETA " + remaining;
     }
     set_label_text_if_changed(remaining_label_, remaining_display);
     lv_obj_set_pos(remaining_label_, 8, 10);
@@ -5252,6 +5242,9 @@ void Ui::remaining_row_event_cb(lv_event_t* event) {
 
 void Ui::handle_remaining_row_click() {
   if (scrolling_) {
+    return;
+  }
+  if (kOnxLandscapeLayout) {
     return;
   }
   // We are inside an LVGL event \u2014 the lvgl_port task already holds the
