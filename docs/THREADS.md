@@ -82,12 +82,50 @@ Scope:
 - CMake and sdkconfig.
 - Partition table.
 - Build, flash, and packaging commands.
+- Release version plumbing and release-package reproducibility.
 
 Boundaries:
 
 - Should not switch global toolchain version without main-thread approval.
 - Should not create alternate build flows.
 - Should maintain `docs/BUILD_FLASH.md` as the source of truth.
+- Must define the standard way to build public release firmware before any
+  public release is published.
+- Must ensure the firmware asset name, `PRINTSPHERE_RELEASE_VERSION`,
+  `PROJECT_VER`, package metadata, and any device-visible version text agree.
+- Must treat mismatched version output as a release blocker, not as a README or
+  packaging-thread issue.
+- Must not publish GitHub releases or push repository changes without
+  main-thread approval.
+
+## Release / README Planning Thread
+
+Scope:
+
+- Public project README content.
+- Release notes and release-asset descriptions.
+- Public repository file tree and exclusion list.
+- License, attribution, disclaimer, and NOTICE text.
+- GitHub fork/publish plan and handoff checklist.
+
+Boundaries:
+
+- Should not change runtime code, BSP code, protocol code, CMake release
+  plumbing, sdkconfig, partition layout, or flash flow.
+- Should not create remotes, push branches, create GitHub releases, or upload
+  assets without main-thread approval.
+- Should not decide a release-version workaround by editing README text. If a
+  candidate firmware file is named `v0.1.0` but the build or device metadata
+  reports another version, it must report this as a Build/Release or
+  Env/Serial/Flash blocker.
+- Must state that OpenNextion-printsphere is a non-commercial derivative of
+  PrintSphere under the root FNCL v1.1 license in README, release notes, and
+  release asset descriptions.
+- Must keep firmware `.bin` files as GitHub Release assets, not git-tracked
+  repository files.
+- Must keep internal thread notes, milestone/debug docs, serial captures,
+  Codex coordination records, and local build artifacts out of the public
+  repository file list.
 
 ## App / Protocol Thread
 

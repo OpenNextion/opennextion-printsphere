@@ -209,6 +209,78 @@ landscape in the same checkout. CMake caches cache-string options inside the
 current build directory, so relying on the implicit default after a previous
 landscape build can reuse the cached landscape value.
 
+## Release Build Version Gate
+
+Public release firmware must not be published until the Build/Release or
+Env/Serial/Flash owner has confirmed the standard release-version flow.
+
+Before any public GitHub Release asset is uploaded, the executing thread must
+record and verify:
+
+- Intended public release tag, for example `v0.1.0`.
+- Firmware asset filename and board/orientation, for example
+  `opennextion-printsphere-onx3248g035-landscape-full-v0.1.0.bin`.
+- CMake `PRINTSPHERE_RELEASE_VERSION`.
+- CMake `PROJECT_VER`.
+- Packager version argument and generated archive name.
+- Any device-visible or log-visible firmware version text, if present.
+- SHA256 of the final release asset.
+
+All version fields must agree. A candidate firmware named `v0.1.0` while the
+build, package metadata, or device-visible version still reports another value
+such as `v1.6-beta1` is not releasable. Treat this as a Build/Release or
+Env/Serial/Flash blocker and do not solve it by changing README or Release
+notes text.
+
+The Release/README planning thread may draft asset names and release notes, but
+it must not change CMake release plumbing or declare a candidate binary ready
+for public release. The main thread must review the version evidence before any
+release asset is uploaded.
+
+### Current v0.1.0 Release Recommendation
+
+For the first OpenNextion-printsphere public release, use an explicit release
+version build rather than renaming a candidate binary by hand.
+
+The current root `CMakeLists.txt` defines:
+
+```cmake
+set(PRINTSPHERE_RELEASE_VERSION "v1.6-beta1")
+set(PROJECT_VER "${PRINTSPHERE_RELEASE_VERSION}")
+```
+
+That ordinary `set(...)` assignment overrides a command-line cache value such
+as `-DPRINTSPHERE_RELEASE_VERSION=v0.1.0`. Therefore `v0.1.0` release builds are
+blocked until release-version plumbing is changed to allow an explicit release
+version override, for example:
+
+```cmake
+set(PRINTSPHERE_RELEASE_VERSION "v1.6-beta1" CACHE STRING "PrintSphere release version")
+set(PROJECT_VER "${PRINTSPHERE_RELEASE_VERSION}")
+message(STATUS "PrintSphere release version: ${PRINTSPHERE_RELEASE_VERSION}")
+```
+
+After that plumbing is fixed, the standard ONX3248G035 landscape release build
+should use an isolated build directory to avoid stale CMake cache values:
+
+```sh
+cd /Users/alex/Documents/codex_project/Nextion_project_PrintSphere
+export IDF_TOOLS_PATH="$PWD/.tools/espressif"
+. "$PWD/.tools/esp-idf-v6.0.1/export.sh"
+
+idf.py -B build-release/onx3248g035-landscape-v0.1.0 \
+  -DPRINTSPHERE_BOARD=onx3248g035 \
+  -DPRINTSPHERE_ONX_ORIENTATION=landscape \
+  -DPRINTSPHERE_RELEASE_VERSION=v0.1.0 \
+  build release_initial_flash
+```
+
+The existing candidate file
+`release/candidates/opennextion-printsphere-onx3248g035-landscape-full-v0.1.0.bin`
+is not a final public release asset until this gate passes. Once the release
+version is correctly wired, regenerate the final binary and record a fresh
+SHA256 because the embedded project version changes the firmware image.
+
 For the ONX BSP smoke project, Component Manager must be disabled because the
 project uses only ESP-IDF components plus the local ONX BSP component:
 
