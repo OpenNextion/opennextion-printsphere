@@ -1,0 +1,13 @@
+name: Public tree check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  public-tree-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check public repository tree
+        run: python3 tools/check_public_tree.py
